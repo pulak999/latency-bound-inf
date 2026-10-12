@@ -40,7 +40,7 @@ would build the image yourself. NVIDIA publishes its own Thor containers on NGC 
 ### Conventions
 
 - Everything under `/data/projects/pulak/`: `models/`, `envs/`, `src/`, `runs/`.
-- One environment per stack, never shared. `uv` for Python envs (`pip install --user uv`), Docker only where NVIDIA ships the image.
+- One environment per stack, never shared. `uv` for Python envs (standalone installer: `curl -LsSf https://astral.sh/uv/install.sh | sh`; system pip is PEP 668 locked), Docker only where NVIDIA ships the image.
 - Torch pin for every venv: `torch==2.10.0 --index-url https://download.pytorch.org/whl/cu130` (proven on this box).
 - Hugging Face token in `~/.cache/huggingface/token` (`hf auth login`). Gemma 3 and the pi checkpoints are gated or large.
 - Every run writes one JSONL file of per-request records plus a `tegrastats` log (section 5).
@@ -60,10 +60,10 @@ mkdir -p /data/projects/pulak/{models,envs,src,runs}
 cd /data/projects/pulak/src
 git clone https://github.com/ggml-org/llama.cpp
 cd llama.cpp
-cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=110
+cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=110 -DLLAMA_CURL=OFF   # no libcurl-dev on the box
 cmake --build build -j"$(nproc)" --target llama-mtmd-cli llama-server   # about 10 to 20 min on Thor
 
-pip install --user -U "huggingface_hub[cli]" && hf auth login
+uv tool install huggingface_hub && hf auth login
 hf download google/gemma-3-4b-it-qat-q4_0-gguf \
    --local-dir /data/projects/pulak/models/gemma-3-4b-it-qat-q4_0
 # files: gemma-3-4b-it-q4_0.gguf, mmproj-model-f16-4B.gguf
@@ -76,7 +76,7 @@ M=/data/projects/pulak/models/gemma-3-4b-it-qat-q4_0
 
 # for the harness: OpenAI-compatible server, single slot
 ./build/bin/llama-server -m $M/gemma-3-4b-it-q4_0.gguf --mmproj $M/mmproj-model-f16-4B.gguf \
-   -ngl 99 --port 8081 --parallel 1 --cont-batching off
+   -ngl 99 --port 8081 --parallel 1 --no-cont-batching
 ```
 
 Done when: a label comes back, and `tegrastats` shows the GPU rail moving during the request.
