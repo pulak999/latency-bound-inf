@@ -1,0 +1,21 @@
+# Lint and clean-install check. Unit tests run locally (they need nothing but Python,
+# so CI would only repeat them); this job catches what a set-up machine hides:
+# missing dependencies, packaging mistakes, import errors.
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint-and-install:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+      - run: uv run python -m harness.run_a1 --help
+      - run: uv run python -m harness.report --help

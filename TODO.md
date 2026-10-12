@@ -19,17 +19,17 @@ Real data (Sentinel-2, LIBERO sim), co-located load and power-mode sweeps come l
 - [x] Clone and build llama.cpp with CUDA for `sm_110` (`llama-mtmd-cli`, `llama-server`)
 - [x] Download `google/gemma-3-4b-it-qat-q4_0-gguf`
 - [x] Smoke test: one synthetic image, one label, GPU rail moves in tegrastats
-- [ ] Start llama-server single slot on port 8081
+- [x] Start llama-server single slot on port 8081
 
 ## Step 2: harness v1 on A1
-- [ ] Synthetic image generator (fixed size, seeded, reproducible)
-- [ ] Record schema + JSONL writer
-- [ ] Fixed-rate feeder on a monotonic clock (latency mode)
-- [ ] Closed-loop / saturation mode (throughput mode)
-- [ ] llama-server client adapter (streaming, engine `timings`)
-- [ ] Co-tenant snapshot and power-mode capture
-- [ ] tegrastats logger
-- [ ] Reporter: latency p50, p99, p99/p50, miss rate, Wilson CI, CDF plot; throughput in requests/s; energy per request
+- [x] Synthetic image generator (fixed size, seeded, reproducible)
+- [x] Record schema + JSONL writer
+- [x] Fixed-rate feeder on a monotonic clock (latency mode)
+- [x] Closed-loop / saturation mode (throughput mode)
+- [x] llama-server client adapter (streaming, engine `timings`)
+- [x] Co-tenant snapshot and power-mode capture
+- [x] tegrastats logger
+- [x] Reporter: latency p50, p99, p99/p50, miss rate, Wilson CI, CDF plot; throughput in requests/s; energy per request
 - [ ] Run 100 synthetic requests at T = 30 s, GPU idle; reproduce report from log alone
 - [ ] Throughput run at saturation; report requests/s
 
