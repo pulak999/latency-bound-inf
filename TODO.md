@@ -10,15 +10,15 @@ Real data (Sentinel-2, LIBERO sim), co-located load and power-mode sweeps come l
 ## Step 0: blockers (people, not code)
 - [ ] Agree GPU booking convention: `/data/gpu-lock` (owner, purpose, ETA) + post in `#latency-bound-inf`
 - [ ] Ask admin for sudo on `nvpmodel`, `jetson_clocks`, MIG (or a booked window)
-- [ ] `hf auth login` with a token that has Gemma 3 access
+- [x] `hf auth login` with a token that has Gemma 3 access
 - [x] Fix the two command bugs in the plan (`--no-cont-batching`; no `pip install --user`)
 
 ## Step 1: A1 llama.cpp + Gemma 3 4B QAT Q4_0
-- [ ] Install `uv` (standalone installer) and `hf` CLI (`uv tool install`)
-- [ ] Create `/data/projects/pulak/{models,envs,src,runs}`
-- [ ] Clone and build llama.cpp with CUDA for `sm_110` (`llama-mtmd-cli`, `llama-server`)
-- [ ] Download `google/gemma-3-4b-it-qat-q4_0-gguf`
-- [ ] Smoke test: one synthetic image, one label, GPU rail moves in tegrastats
+- [x] Install `uv` (standalone installer) and `hf` CLI (`uv tool install`)
+- [x] Create `/data/projects/pulak/{models,envs,src,runs}`
+- [x] Clone and build llama.cpp with CUDA for `sm_110` (`llama-mtmd-cli`, `llama-server`)
+- [x] Download `google/gemma-3-4b-it-qat-q4_0-gguf`
+- [x] Smoke test: one synthetic image, one label, GPU rail moves in tegrastats
 - [ ] Start llama-server single slot on port 8081
 
 ## Step 2: harness v1 on A1
