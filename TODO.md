@@ -31,7 +31,7 @@ Real data (Sentinel-2, LIBERO sim), co-located load and power-mode sweeps come l
 - [x] tegrastats logger
 - [x] Reporter: latency p50, p99, p99/p50, miss rate, Wilson CI, CDF plot; throughput in requests/s; energy per request
 - [x] Run 100 synthetic requests at T = 30 s, GPU idle; reproduce report from log alone (2026-10-12; latency inflated ~27 ms by sleep overshoot, since fixed)
-- [ ] Re-run the 100-request A1 run with the sleep fix
+- [x] Re-run the 100-request A1 run with the sleep fix (a1-latency-20261012-210527: p50 1659 ms, p99 1670 ms, 0/100 missed)
 - [ ] Investigate idle-gap slowdown: SmolVLA 289 ms at 1 Hz vs 188 ms back to back (GPU clocks?)
 - [ ] Throughput run at saturation; report requests/s
 
