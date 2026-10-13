@@ -20,8 +20,8 @@ Real data (Sentinel-2, LIBERO), co-located workloads and power-mode sweeps are l
 ## Layout
 
 - `control-folder/` — notes, slides, plans. Plans are the source of truth for what to build.
-- `harness/` (planned) — shared fixed-rate feeder, JSONL records, tegrastats capture, reporting. Python 3.12.
-- `setup/` (planned) — scripts that build engines and envs under `/data/projects/pulak/`.
+- `harness/` — shared fixed-rate feeder, JSONL records, tegrastats capture, reporting. Python 3.12.
+- `setup/` — scripts that build engines and envs under `/data/projects/pulak/`.
 - Heavy artifacts never go in git. They live under `/data/projects/pulak/{models,envs,src,runs}`.
 
 ## Build and environment
@@ -31,6 +31,17 @@ Real data (Sentinel-2, LIBERO), co-located workloads and power-mode sweeps are l
 - CUDA builds target `CMAKE_CUDA_ARCHITECTURES=110` / `TORCH_CUDA_ARCH_LIST="11.0"`.
 - Docker only where NVIDIA ships the image (NGC, needs `docker login nvcr.io`).
 - HF token at `~/.cache/huggingface/token` (`hf auth login`). Gemma 3 is gated.
+
+## Running
+
+```bash
+uv run pytest && uv run ruff check && uv run ruff format --check     # local checks
+uv run python -m harness.run_a1 latency --period 30 --n-requests 100  # Stack A
+/data/projects/pulak/envs/lerobot/bin/python -m harness.run_b1 --policy smolvla latency  # Stack B
+uv run python -m harness.report /data/projects/pulak/runs/<run>       # rebuild a report from logs
+```
+
+Readability matters for `harness/` (reviewed and reused). `setup/` scripts only need to work.
 
 ## Conventions
 

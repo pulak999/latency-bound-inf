@@ -83,3 +83,20 @@ def test_summarize_throughput_mode_has_no_deadline_section():
     summary = summarize(records, power)
     assert "deadline_misses" not in summary
     assert summary["throughput_rps"] == pytest.approx(1.0)
+
+
+def test_summarize_robot_records_without_tokens():
+    # A policy returns its whole chunk at once: no first token, stage timings instead.
+    records = []
+    for i in range(4):
+        record = make_record(i, t_arrival=float(i), latency_s=0.2, deadline=float(i) + 1.0)
+        record.t_first_token = None
+        record.engine_stages_ms = {"preprocess": 10.0, "inference": 150.0, "postprocess": 5.0}
+        records.append(record)
+    power = [PowerSample(t=i * 0.01, gpu_w=10.0, board_w=30.0) for i in range(500)]
+    summary = summarize(records, power)
+
+    assert "time_to_first_token_ms" not in summary
+    assert summary["engine_ms"]["p50"] == 165.0
+    assert summary["outside_engine_ms"]["p50"] == pytest.approx(35.0)
+    assert summary["deadline_misses"]["missed"] == 0

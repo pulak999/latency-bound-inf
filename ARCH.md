@@ -27,7 +27,14 @@ Current scope uses W (synthetic inputs) and M (both stacks). NM and D are held f
   - *Recorder* — appends one JSONL record per request (fields below).
   - *Device logger* — runs `tegrastats --interval 100 --logfile` for the run's duration.
   - *Reporter* — offline: p50, p99, p99/p50, miss rate with Wilson CI, latency CDF, throughput in requests/s, energy per request from rail power.
+  - *Runner* (`harness/runner.py`) — shared by both stacks: command line, run directory, power and
+    tegrastats capture around the measured part, then the report. A stack's run script
+    (`run_a1.py`, `run_b1.py`) only supplies its config and a `send_one` coroutine.
+  - *Engine adapters* (`harness/engines/`): `llama_server` (HTTP, streaming) and
+    `lerobot_policy` (in-process; one worker thread so one request is on the GPU at a time).
 - **Setup scripts** (`setup/`, in git): reproducible build and download steps per plan section.
+- **Environments:** Stack A's client runs in the repo's uv env. Stack B runs in
+  `/data/projects/pulak/envs/lerobot`, with the harness installed into it in editable mode.
 
 ## Data flow
 
@@ -43,4 +50,7 @@ images / sim obs --> feeder --(every T s)--> client adapter --> engine on GPU
 ## Per-request record
 
 `req_id, t_send, t_first_token, t_last_token, n_prompt_tokens, n_output_tokens, deadline, missed, engine, model, quant, power_mode, co_tenants`
-plus engine-side timings where the engine reports them.
+plus engine-side timings where the engine reports them: prompt and decode ms for LLM engines,
+named stages (`engine_stages_ms`: preprocess, inference, postprocess) for robot policies, and
+`n_actions` for the chunk length. A policy's chunk arrives at once, so `t_first_token` is None
+and `t_last_token` is when the chunk was ready.

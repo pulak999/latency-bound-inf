@@ -30,16 +30,22 @@ Real data (Sentinel-2, LIBERO sim), co-located load and power-mode sweeps come l
 - [x] Co-tenant snapshot and power-mode capture
 - [x] tegrastats logger
 - [x] Reporter: latency p50, p99, p99/p50, miss rate, Wilson CI, CDF plot; throughput in requests/s; energy per request
-- [ ] Run 100 synthetic requests at T = 30 s, GPU idle; reproduce report from log alone
+- [x] Run 100 synthetic requests at T = 30 s, GPU idle; reproduce report from log alone (2026-10-12; latency inflated ~27 ms by sleep overshoot, since fixed)
+- [ ] Re-run the 100-request A1 run with the sleep fix
+- [ ] Investigate idle-gap slowdown: SmolVLA 289 ms at 1 Hz vs 188 ms back to back (GPU clocks?)
 - [ ] Throughput run at saturation; report requests/s
 
 ## Step 4: B1 LeRobot on synthetic observations
-- [ ] Decide torch 2.10 vs 2.11 (torchcodec)
-- [ ] LeRobot env (uv, Python 3.12)
-- [ ] Synthetic observation generator (camera images + state, shapes from the policy config, seeded)
-- [ ] SmolVLA: one synthetic observation in, one action chunk out
-- [ ] pi0.5 via LeRobot (find Hub checkpoint name)
-- [ ] Harness adapter for the policy (direct call or async policy server); per-chunk latency p50/p99 and requests/s
+- [x] Decide torch 2.10 vs 2.11: torch 2.10, no `dataset` extra, so no torchcodec
+- [x] pi0.5 LeRobot checkpoint: `lerobot/pi05_libero_finetuned_v044` (old name `lerobot/pi05_libero` redirects)
+- [x] Synthetic observation generator (camera images + state, shapes from the policy config, seeded)
+- [x] In-process policy adapter (preprocess, predict chunk, postprocess; per-stage timings)
+- [x] Shared run plumbing (`harness/runner.py`) used by both stacks
+- [x] LeRobot env: `setup/b1_lerobot.sh` (lerobot 0.6.1, torch 2.10.0+cu130, sm_110 OK)
+- [x] Run unit tests, lint, re-check A1 after the runner refactor (short A1 run)
+- [x] SmolVLA: short latency and throughput runs
+- [x] pi0.5: short latency and throughput runs (torch.compile needs system ptxas for sm_110a)
+- [ ] LeRobot async policy server (gRPC) adapter, to compare with in-process
 
 ## Step 5: A2 vLLM
 - [ ] Find NGC Thor vLLM tag, or build from source for `sm_110`

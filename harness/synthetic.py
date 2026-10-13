@@ -1,8 +1,8 @@
-"""Seeded synthetic images.
+"""Seeded synthetic inputs: images for the VLM, camera-plus-state observations for robot policies.
 
-Every image has the same size, so every request has the same input shape and
-the model does the same amount of work. The same seed always gives the same
-pixels, so a run's inputs can be regenerated from its config.
+Every input of a run has the same shape, so every request does the same amount
+of work. The same seed always gives the same values, so a run's inputs can be
+regenerated from its config.
 """
 
 import io
@@ -31,3 +31,21 @@ def image_pool(n_images: int, first_seed: int = 0) -> list[bytes]:
     reusing work across consecutive requests.
     """
     return [synthetic_png(seed) for seed in range(first_seed, first_seed + n_images)]
+
+
+def synthetic_observation(
+    seed: int, image_shapes: dict[str, tuple[int, int, int]], state_dim: int
+) -> dict[str, np.ndarray]:
+    """A robot observation: one noise image per camera plus a joint-state vector.
+
+    `image_shapes` maps each camera's observation key to its (channels, height, width),
+    as the policy config declares it. Images come back as (height, width, channels)
+    uint8, the layout a camera produces. State is float32, drawn from a unit normal.
+    """
+    rng = np.random.default_rng(seed)
+    observation = {
+        key: rng.integers(0, 256, size=(height, width, channels), dtype=np.uint8)
+        for key, (channels, height, width) in image_shapes.items()
+    }
+    observation["observation.state"] = rng.standard_normal(state_dim).astype(np.float32)
+    return observation

@@ -20,6 +20,8 @@ class RequestRecord:
     t_send: float
 
     # When the first and last output tokens reached the client. None on error.
+    # For a robot policy the whole action chunk arrives at once: t_last_token is
+    # when it was ready and t_first_token is None.
     t_first_token: float | None
     t_last_token: float | None
 
@@ -32,6 +34,8 @@ class RequestRecord:
 
     # The engine's own timing of the same request. The gap between this and the
     # client-side latency is transport, queueing and Python overhead.
+    # LLM engines report prompt and decode time; other engines report named
+    # stages in `engine_stages_ms` instead (e.g. preprocess, inference, postprocess).
     engine_prompt_ms: float | None
     engine_decode_ms: float | None
 
@@ -43,6 +47,20 @@ class RequestRecord:
     co_tenants: list[dict] = field(default_factory=list)
 
     error: str | None = None
+
+    # Robot policies: actions in the returned chunk, and the engine's stage timings.
+    # Both default to None so records written before these fields existed still load.
+    n_actions: int | None = None
+    engine_stages_ms: dict[str, float] | None = None
+
+    @property
+    def engine_total_ms(self) -> float | None:
+        """Time the engine itself spent on this request, however it reports it."""
+        if self.engine_stages_ms:
+            return sum(self.engine_stages_ms.values())
+        if self.engine_prompt_ms is not None and self.engine_decode_ms is not None:
+            return self.engine_prompt_ms + self.engine_decode_ms
+        return None
 
     @property
     def latency_s(self) -> float | None:

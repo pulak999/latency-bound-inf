@@ -19,3 +19,4 @@ jobs:
       - run: uv run ruff format --check
       - run: uv run python -m harness.run_a1 --help
       - run: uv run python -m harness.report --help
+      - run: uv run python -m harness.run_b1 --help

@@ -72,9 +72,6 @@ def summarize(records: list[RequestRecord], power: list[PowerSample]) -> dict:
         "n_requests": len(records),
         "n_errors": len(records) - len(answered),
         "latency_ms": percentiles_ms([r.latency_s for r in answered]),
-        "time_to_first_token_ms": percentiles_ms(
-            [r.t_first_token - r.t_arrival for r in answered if r.t_first_token is not None]
-        ),
         # Requests finished per second while the run was going.
         # Meaningful in throughput mode; in latency mode it is set by the input period.
         "throughput_rps": round(len(answered) / (last_answer - first_send), 4),
@@ -84,13 +81,18 @@ def summarize(records: list[RequestRecord], power: list[PowerSample]) -> dict:
         },
     }
 
+    # Only streaming engines have a first token separate from the last.
+    first_token_s = [r.t_first_token - r.t_arrival for r in answered if r.t_first_token is not None]
+    if first_token_s:
+        summary["time_to_first_token_ms"] = percentiles_ms(first_token_s)
+
     # How much of the latency the engine itself accounts for.
     # The rest is image upload, queueing in the server, and client overhead.
-    with_engine_timing = [r for r in answered if r.engine_prompt_ms is not None]
+    with_engine_timing = [r for r in answered if r.engine_total_ms is not None]
     if with_engine_timing:
 
         def engine_s(r: RequestRecord) -> float:
-            return (r.engine_prompt_ms + r.engine_decode_ms) / 1000
+            return r.engine_total_ms / 1000
 
         def outside_engine_s(r: RequestRecord) -> float:
             return (r.t_last_token - r.t_send) - engine_s(r)

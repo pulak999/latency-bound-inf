@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from harness.feeder import arrival_times, run_closed_loop, run_fixed_rate
+from harness.feeder import arrival_times, run_closed_loop, run_fixed_rate, sleep_until
 
 
 def test_arrival_times_are_evenly_spaced():
@@ -41,3 +41,13 @@ def test_closed_loop_keeps_one_request_in_flight():
     results = asyncio.run(run_closed_loop(send, duration_s=0.1))
     assert max_in_flight == 1
     assert results == list(range(len(results))) and len(results) >= 5
+
+
+def test_sleep_until_wakes_on_time_after_a_long_wait():
+    # A plain 3 s sleep can wake up to 3 ms late on Linux; sleep_until should not.
+    async def overshoot_ms():
+        target = time.monotonic() + 3.0
+        await sleep_until(target)
+        return (time.monotonic() - target) * 1000
+
+    assert asyncio.run(overshoot_ms()) < 1.0
