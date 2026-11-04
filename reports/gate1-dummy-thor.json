@@ -1,0 +1,31 @@
+{
+  "cell": "gate1-T1-20261104-014448",
+  "a_spacing": {
+    "mean_ms": 999.9992982964102,
+    "std_ms": 0.48563430489514625,
+    "max_abs_error_ms": 1.6137040220201015,
+    "emitter_faults": 0,
+    "pass": true
+  },
+  "b_overwritten": {
+    "predicted": 35,
+    "actual": 35,
+    "tolerance": 4,
+    "pass": true
+  },
+  "c_miss_rate_at_T": {
+    "predicted_by_replay": 0.84,
+    "actual": 0.84,
+    "fraction_of_sleeps_over_T": 0.595,
+    "pass": true
+  },
+  "d_interleave": {
+    "sampler_rows": 20546,
+    "first_frame_covered": true,
+    "last_frame_covered": true,
+    "sample_gap_median_ms": 10.000000009313226,
+    "sample_gap_max_ms": 21.019999985583127,
+    "pass": true
+  },
+  "pass": true
+}
