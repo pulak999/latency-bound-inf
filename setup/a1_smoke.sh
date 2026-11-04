@@ -3,7 +3,7 @@
 # Passes if a non-empty label comes back and the VDD_GPU rail rises above its idle reading.
 set -euo pipefail
 
-ROOT=/data/projects/pulak
+ROOT=${ROOT:-/data/projects/rohan}   # override: ROOT=/data/projects/x setup/...
 BIN=$ROOT/src/llama.cpp/build/bin
 M=$ROOT/models/gemma-3-4b-it-qat-q4_0
 OUT=$ROOT/runs/smoke-a1-$(date +%Y%m%d-%H%M%S)

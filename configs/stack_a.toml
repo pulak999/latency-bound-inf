@@ -1,0 +1,60 @@
+# Stack A deadline-miss cells on the Thor. Every tunable lives here.
+# Run one cell:   uv run python -m harness.controller configs/stack_a.toml --cells alone-T20
+# Dry run (sleeps instead of a model):  ... --engine dummy
+
+[harness]
+runs_dir = "/data/projects/rohan/runs"
+warmup_frames = 20          # sent before the emitter starts; not recorded
+start_delay_s = 1.0
+emitter_max_late_fraction = 0.10   # a tick later than this fraction of T is an emitter fault
+sampler_interval_s = 0.01
+
+[model]
+name = "gemma-3-4b-it"
+quant = "QAT Q4_0"
+# One-token answer, so each request is pure prefill. The label words must be
+# checked on the device (DESIGN.md section 2, task 3) before the real cells run.
+prompt = "Decide whether to keep or drop this satellite image for downlink. Drop it if it is mostly cloud or open water. Answer with exactly one word: keep or drop."
+max_tokens = 1
+labels = ["keep", "drop"]
+
+[llama_server]
+server_bin = "/data/projects/rohan/src/llama.cpp/build/bin/llama-server"
+model = "/data/projects/rohan/models/gemma-3-4b-it-qat-q4_0/gemma-3-4b-it-q4_0.gguf"
+mmproj = "/data/projects/rohan/models/gemma-3-4b-it-qat-q4_0/mmproj-model-f16-4B.gguf"
+port = 8081
+request_timeout_s = 300
+
+[dummy]                     # only used with --engine dummy
+kind = "uniform"
+low_s = 0.2
+high_s = 2.0
+seed = 0
+
+[tiles]
+dir = "/data/projects/rohan/tiles"   # PNGs + index.csv; if absent, synthetic noise is used
+synthetic_count = 64
+image_size = 896
+
+# DESIGN.md section 4: 500 frames at 1.5 s and 5 s, 200 at 20 s.
+# 2 s is added because the model alone takes about 1.66 s per frame, so 1.5 s
+# misses everything and 5 s misses nothing; 2 s sits where the tail matters.
+[[cells]]
+id = "alone-T20"
+cadence_s = 20.0
+frames = 200
+
+[[cells]]
+id = "alone-T5"
+cadence_s = 5.0
+frames = 500
+
+[[cells]]
+id = "alone-T2"
+cadence_s = 2.0
+frames = 500
+
+[[cells]]
+id = "alone-T1.5"
+cadence_s = 1.5
+frames = 500

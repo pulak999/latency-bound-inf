@@ -92,3 +92,37 @@ def test_engine_total_prefers_named_stages():
         engine_stages_ms={"preprocess": 5.0, "inference": 180.0, "postprocess": 1.0},
     )
     assert record.engine_total_ms == 186.0
+
+
+def test_overwritten_record_is_a_miss_with_no_timings(tmp_path):
+    record = RequestRecord.overwritten(
+        3, 10.0, 11.0, "tile-3", engine="e", model="m", quant="q", power_mode="p"
+    )
+    assert record.outcome == "overwritten"
+    assert record.t_send is None and record.latency_s is None and record.waiting_s is None
+    assert record.missed is True
+    path = tmp_path / "records.jsonl"
+    write_records(path, [record])
+    assert read_records(path) == [record]
+
+
+def test_an_error_sets_the_outcome_and_old_lines_without_outcome_load():
+    record = RequestRecord(
+        req_id=0,
+        t_arrival=0.0,
+        t_send=0.0,
+        t_first_token=None,
+        t_last_token=None,
+        deadline=None,
+        n_prompt_tokens=None,
+        n_output_tokens=None,
+        output_text="",
+        engine_prompt_ms=None,
+        engine_decode_ms=None,
+        engine="e",
+        model="m",
+        quant="q",
+        power_mode="p",
+        error="boom",
+    )
+    assert record.outcome == "error"

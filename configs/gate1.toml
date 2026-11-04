@@ -1,0 +1,33 @@
+# DESIGN.md section 4, gate 1: the harness against a sleeping stand-in model.
+#   uv run python -m harness.controller configs/gate1.toml --engine dummy
+#   uv run python -m harness.gate1 <cell dir>
+# Runs anywhere; needs no GPU. ~4 minutes.
+
+[harness]
+runs_dir = "runs"           # relative to the working directory; gitignored
+warmup_frames = 5
+start_delay_s = 0.5
+emitter_max_late_fraction = 0.10
+sampler_interval_s = 0.01
+
+[model]
+name = "dummy"
+quant = "n/a"
+prompt = "unused"
+max_tokens = 1
+labels = ["keep"]
+
+[dummy]
+kind = "uniform"
+low_s = 0.2
+high_s = 2.0
+seed = 0
+
+[tiles]
+synthetic_count = 8
+image_size = 64             # tiny: the dummy never looks at the image
+
+[[cells]]
+id = "gate1-T1"
+cadence_s = 1.0
+frames = 200

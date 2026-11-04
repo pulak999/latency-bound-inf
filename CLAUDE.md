@@ -12,17 +12,20 @@ Two use cases on one NVIDIA Jetson AGX Thor (JetPack 7, CUDA 13.2, `sm_110`, 122
 
 ## Current scope
 
-Synthetic inputs only, model running alone on an idle GPU, both stacks.
-Stack A: one synthetic image in, one label out. Stack B: one synthetic observation in, one action chunk out.
-Metrics: latency percentiles (p50, p99) and throughput as requests/s. p99 is a latency term only.
-Real data (Sentinel-2, LIBERO), co-located workloads and power-mode sweeps are later.
+`DESIGN.md` is the spec for Stack A: a fixed-rate frame stream through a depth-1 mailbox,
+one-token keep/drop answers, miss rate at deadline D applied to the log afterwards.
+Build order and gates are in DESIGN.md section 4; gate reports go in `reports/`.
+Co-runners and power modes are later extensions; the config loader refuses cells that ask for them.
+Stack B (`run_b1.py`) keeps the older fixed-rate runner and shares records and reporting.
 
 ## Layout
 
-- `control-folder/` — notes, slides, plans. Plans are the source of truth for what to build.
-- `harness/` — shared fixed-rate feeder, JSONL records, tegrastats capture, reporting. Python 3.12.
-- `setup/` — scripts that build engines and envs under `/data/projects/pulak/`.
-- Heavy artifacts never go in git. They live under `/data/projects/pulak/{models,envs,src,runs}`.
+- `control-folder/` — notes, slides, plans. `DESIGN.md` at the root is the current spec.
+- `harness/` — feeder and mailbox, engines, device sampling, controller, reporter, gate checker. Python 3.12.
+- `configs/` — TOML cell matrices; every tunable lives here, not in code.
+- `setup/` — scripts that build engines and envs, and cut Sentinel-2 tiles.
+- Heavy artifacts never go in git. On the Thor they live under `/data/projects/rohan/{models,src,runs,tiles}`
+  (`/data/projects/pulak/` is the colleague's tree: usable, not ours to change).
 
 ## Build and environment
 
@@ -36,19 +39,25 @@ Real data (Sentinel-2, LIBERO), co-located workloads and power-mode sweeps are l
 
 ```bash
 uv run pytest && uv run ruff check && uv run ruff format --check     # local checks
-uv run python -m harness.run_a1 latency --period 30 --n-requests 100  # Stack A
+uv run python -m harness.controller configs/gate1.toml --engine dummy  # gate 1, no GPU needed
+uv run python -m harness.gate1 runs/gate1-T1-<timestamp>              # gate 1 checks
+uv run python -m harness.controller configs/stack_a.toml --cells alone-T20 --max-minutes 90  # Stack A
 /data/projects/pulak/envs/lerobot/bin/python -m harness.run_b1 --policy smolvla latency  # Stack B
-uv run python -m harness.report /data/projects/pulak/runs/<run>       # rebuild a report from logs
+uv run python -m harness.report <cell dir>                            # rebuild a report from logs
+uv run python -m harness.compare <cell dirs...> -o reports/<name>     # cells on one axis
 ```
+
+`test_sleep_until_wakes_on_time_after_a_long_wait` can fail on macOS (timer jitter); it is a Linux check.
 
 Readability matters for `harness/` (reviewed and reused). `setup/` scripts only need to work.
 
 ## Conventions
 
-- Every measurement run writes one JSONL of per-request records plus a `tegrastats` log into `/data/projects/pulak/runs/<run>/`.
-- Every record carries engine, model, quant, power mode and co-tenant GPU processes at send time.
-- The feeder never waits for the model. Requests fire on a monotonic clock.
-- Generation output is fixed-length (temperature 0, fixed `-n`) so latency reflects the system, not output length.
+- Every cell writes `manifest.json`, `records.jsonl`, `power.csv`, `gpu_util.csv`, `tegrastats.log` and the report into its own directory; a rerun gets a new directory, nothing is overwritten.
+- Every record carries engine, model, quant, power mode, co-tenant GPU processes at send time, and an `outcome` (`ok`, `overwritten`, `error`).
+- The feeder never waits for the model. Frames fire on a monotonic clock into a depth-1 mailbox; a replaced frame is a miss.
+- Stack A answers with one token (`max_tokens = 1`, temperature 0), so each request is pure prefill.
+- tegrastats on JetPack 7 has no GPU clock or load; the clock comes from `/sys/class/devfreq/gpu-gpc-0/cur_freq`, load from `nvidia-smi`.
 
 ## Key design decisions
 
@@ -59,4 +68,4 @@ Readability matters for `harness/` (reviewed and reused). `setup/` scripts only 
 
 ## Tests
 
-None yet. Harness logic gets pytest unit tests under `harness/tests/`. No CI workflow exists.
+Unit tests under `harness/tests/` (`uv run pytest`). CI (`.github/workflows/ci.yml`) lints, installs and runs every `--help`.

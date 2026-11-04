@@ -12,6 +12,11 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pytest>=8.3", "ruff>=0.6"]
+tiles = [
+    "planetary-computer>=1.0",
+    "pystac-client>=0.8",
+    "rasterio>=1.4",
+]
 
 [build-system]
 requires = ["hatchling"]

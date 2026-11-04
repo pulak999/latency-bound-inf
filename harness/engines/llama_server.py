@@ -8,10 +8,15 @@ import base64
 import json
 import subprocess
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
+
+from harness.engines.base import NO_REPLY, Reply
+
+__all__ = ["NO_REPLY", "Reply", "LlamaServer", "LlamaServerConfig", "encode_request", "send"]
 
 LLAMA_CPP = Path("/data/projects/pulak/src/llama.cpp")
 SERVER_BIN = LLAMA_CPP / "build/bin/llama-server"
@@ -22,6 +27,8 @@ class LlamaServerConfig:
     model: Path
     mmproj: Path
     port: int = 8081
+    server_bin: Path = SERVER_BIN
+    request_timeout_s: float = 300.0
 
     @property
     def url(self) -> str:
@@ -31,6 +38,8 @@ class LlamaServerConfig:
 class LlamaServer:
     """Starts llama-server for a `with` block and stops it afterwards."""
 
+    name = "llama.cpp"
+
     def __init__(self, config: LlamaServerConfig, logfile: Path):
         self.config = config
         self.logfile = logfile
@@ -38,7 +47,7 @@ class LlamaServer:
 
     def __enter__(self) -> "LlamaServer":
         command = [
-            str(SERVER_BIN),
+            str(self.config.server_bin),
             "--model",
             str(self.config.model),
             "--mmproj",
@@ -75,23 +84,28 @@ class LlamaServer:
         raise TimeoutError(f"llama-server not healthy after {timeout_s} s; see {self.logfile}")
 
     def commit(self) -> str:
-        """The llama.cpp git commit the binary was built from."""
-        return (LLAMA_CPP / "build/COMMIT").read_text().strip()
+        """The llama.cpp git commit the binary was built from (setup/a1_llamacpp.sh writes it)."""
+        commit_file = self.config.server_bin.parent.parent / "COMMIT"
+        return commit_file.read_text().strip() if commit_file.exists() else "unknown"
 
+    @property
+    def version(self) -> str:
+        return self.commit()
 
-@dataclass
-class Reply:
-    t_first_token: float | None
-    t_last_token: float | None
-    text: str
-    n_prompt_tokens: int | None
-    n_output_tokens: int | None
-    engine_prompt_ms: float | None
-    engine_decode_ms: float | None
+    def pids(self) -> set[int]:
+        return {self.process.pid} if self.process else set()
 
+    def prepare(self, image_png: bytes, prompt: str, max_tokens: int) -> bytes:
+        return encode_request(image_png, prompt, max_tokens)
 
-# What a failed request records: no tokens, no times.
-NO_REPLY = Reply(None, None, "", None, None, None, None)
+    @asynccontextmanager
+    async def session(self):
+        async with httpx.AsyncClient(timeout=self.config.request_timeout_s) as client:
+
+            async def send_body(body: bytes) -> Reply:
+                return await send(client, self.config.url, body)
+
+            yield send_body
 
 
 def encode_request(image_png: bytes, prompt: str, n_output_tokens: int) -> bytes:

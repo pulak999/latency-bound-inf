@@ -3,7 +3,7 @@
 # Idempotent: re-running skips finished stages. Model download needs `hf auth login` first.
 set -euo pipefail
 
-ROOT=/data/projects/pulak
+ROOT=${ROOT:-/data/projects/rohan}   # override: ROOT=/data/projects/x setup/...
 SRC=$ROOT/src/llama.cpp
 MODEL_DIR=$ROOT/models/gemma-3-4b-it-qat-q4_0
 export PATH="$HOME/.local/bin:/usr/local/cuda/bin:$PATH"

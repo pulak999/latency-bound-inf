@@ -100,3 +100,41 @@ def test_summarize_robot_records_without_tokens():
     assert summary["engine_ms"]["p50"] == 165.0
     assert summary["outside_engine_ms"]["p50"] == pytest.approx(35.0)
     assert summary["deadline_misses"]["missed"] == 0
+
+
+def test_overwritten_frames_count_as_misses_at_every_deadline():
+    from harness.report import miss_rate_at, miss_rate_curve
+
+    records = [
+        make_record(0, t_arrival=0.0, latency_s=0.5, deadline=1.0),
+        make_record(1, t_arrival=1.0, latency_s=1.5, deadline=2.0),
+        RequestRecord.overwritten(
+            2, 2.0, 3.0, "t", engine="e", model="m", quant="q", power_mode="p"
+        ),
+    ]
+    assert miss_rate_at(records, 0.4) == 1.0
+    assert miss_rate_at(records, 1.0) == pytest.approx(2 / 3)
+    assert miss_rate_at(records, 10.0) == pytest.approx(1 / 3)
+    deadlines, rates = miss_rate_curve(records, 3.0, n_points=4)
+    assert list(deadlines) == [0.0, 1.0, 2.0, 3.0]
+    assert rates[-1] == pytest.approx(1 / 3)
+
+    summary = summarize(
+        records,
+        [PowerSample(t=i * 0.01, gpu_w=1.0, board_w=2.0, gpu_mhz=900.0) for i in range(300)],
+    )
+    assert summary["outcomes"] == {"ok": 2, "overwritten": 1, "error": 0}
+    assert summary["deadline_misses"]["missed"] == 2
+    assert summary["gpu_mhz"]["mean"] == 900.0
+    assert summary["waiting_ms"]["max"] == 0.0
+
+
+def test_summary_of_a_cell_with_nothing_answered_has_only_counts():
+    records = [
+        RequestRecord.overwritten(
+            0, 0.0, 1.0, "t", engine="e", model="m", quant="q", power_mode="p"
+        )
+    ]
+    summary = summarize(records, [])
+    assert summary["outcomes"]["overwritten"] == 1
+    assert "latency_ms" not in summary
