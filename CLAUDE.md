@@ -39,6 +39,7 @@ uv run pytest && uv run ruff check && uv run ruff format --check     # local che
 uv run python -m harness.run_a1 latency --period 30 --n-requests 100  # Stack A
 /data/projects/pulak/envs/lerobot/bin/python -m harness.run_b1 --policy smolvla latency  # Stack B
 uv run python -m harness.report /data/projects/pulak/runs/<run>       # rebuild a report from logs
+uv run python -m harness.sweep run smolvla                             # period sweep (smolvla, pi05, a1)
 ```
 
 Readability matters for `harness/` (reviewed and reused). `setup/` scripts only need to work.
@@ -59,4 +60,5 @@ Readability matters for `harness/` (reviewed and reused). `setup/` scripts only 
 
 ## Tests
 
-None yet. Harness logic gets pytest unit tests under `harness/tests/`. No CI workflow exists.
+Unit tests in `harness/tests/` (pytest), run locally. CI (`.github/workflows/ci.yml`) runs lint,
+format and a clean-install `--help` check of each entry point; it cannot use the GPU.

@@ -96,7 +96,7 @@ def main() -> None:
 
     policy_type, checkpoint = POLICIES[args.policy]
     policy = LeRobotPolicy(checkpoint, policy_type)
-    run_dir = runner.new_run_dir(f"b1-{args.policy}", args.mode)
+    run_dir = runner.new_run_dir(args.out, f"b1-{args.policy}", args.mode)
     mode = power_mode()
 
     config = vars(args) | {

@@ -20,3 +20,4 @@ jobs:
       - run: uv run python -m harness.run_a1 --help
       - run: uv run python -m harness.report --help
       - run: uv run python -m harness.run_b1 --help
+      - run: uv run python -m harness.sweep --help

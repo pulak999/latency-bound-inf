@@ -12,7 +12,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime
 from pathlib import Path
 
-from harness.device import PowerSampler, Tegrastats
+from harness.device import DeviceSampler, Tegrastats
 from harness.feeder import SendOne, run_closed_loop, run_fixed_rate
 from harness.records import RequestRecord, write_records
 from harness.report import report
@@ -23,6 +23,12 @@ RUNS_DIR = Path("/data/projects/pulak/runs")
 def mode_arguments(description: str, default_period_s: float) -> argparse.ArgumentParser:
     """The two run modes every stack offers, as `latency` and `throughput` subcommands."""
     parser = argparse.ArgumentParser(description=description)
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=RUNS_DIR,
+        help=f"directory to create the run directory in (default {RUNS_DIR})",
+    )
     modes = parser.add_subparsers(dest="mode", required=True)
 
     latency = modes.add_parser("latency", help="fixed-rate input; report latency and misses")
@@ -46,8 +52,8 @@ def mode_arguments(description: str, default_period_s: float) -> argparse.Argume
     return parser
 
 
-def new_run_dir(stack: str, mode: str) -> Path:
-    run_dir = RUNS_DIR / f"{stack}-{mode}-{datetime.now():%Y%m%d-%H%M%S}"
+def new_run_dir(parent: Path, stack: str, mode: str) -> Path:
+    run_dir = parent / f"{stack}-{mode}-{datetime.now():%Y%m%d-%H%M%S}"
     run_dir.mkdir(parents=True)
     return run_dir
 
@@ -73,17 +79,17 @@ async def send_on_schedule(args: argparse.Namespace, send_one: SendOne) -> list[
 def measure_and_report(
     run_dir: Path, config: dict, measure: Callable[[], Awaitable[list[RequestRecord]]]
 ) -> None:
-    """Write the config, run `measure` while capturing power and tegrastats, then report."""
+    """Write the config, run `measure` while sampling power, clocks and tegrastats, then report."""
     config = config | {
         "harness_commit": harness_commit(),
         "started": datetime.now().isoformat(timespec="seconds"),
     }
-    (run_dir / "run.json").write_text(json.dumps(config, indent=2) + "\n")
+    (run_dir / "run.json").write_text(json.dumps(config, indent=2, default=str) + "\n")
 
-    with Tegrastats(run_dir / "tegrastats.log"), PowerSampler() as power:
+    with Tegrastats(run_dir / "tegrastats.log"), DeviceSampler() as device:
         records = asyncio.run(measure())
 
     write_records(run_dir / "records.jsonl", records)
-    power.write_csv(run_dir / "power.csv")
+    device.write_csv(run_dir / "device.csv")
     print(json.dumps(report(run_dir), indent=2))
     print(f"run directory: {run_dir}")

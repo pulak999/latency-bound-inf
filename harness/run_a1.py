@@ -85,7 +85,7 @@ async def measure(
 
 def main() -> None:
     args = runner.mode_arguments(__doc__.splitlines()[0], default_period_s=30.0).parse_args()
-    run_dir = runner.new_run_dir("a1", args.mode)
+    run_dir = runner.new_run_dir(args.out, "a1", args.mode)
     mode = power_mode()
 
     with llama_server.LlamaServer(SERVER, logfile=run_dir / "llama-server.log") as server:

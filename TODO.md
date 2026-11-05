@@ -33,7 +33,12 @@ Real data (Sentinel-2, LIBERO sim), co-located load and power-mode sweeps come l
 - [x] Run 100 synthetic requests at T = 30 s, GPU idle; reproduce report from log alone (2026-10-12; latency inflated ~27 ms by sleep overshoot, since fixed)
 - [x] Re-run the 100-request A1 run with the sleep fix (a1-latency-20261012-210527: p50 1659 ms, p99 1670 ms, 0/100 missed)
 - [ ] Investigate idle-gap slowdown: SmolVLA 289 ms at 1 Hz vs 188 ms back to back (GPU clocks?)
-- [ ] Throughput run at saturation; report requests/s
+  - [x] Sample GPU and memory clocks from sysfs every 10 ms (`device.csv`)
+  - [x] Report: per-stage breakdown, slowest-1% attribution by stage, GPU clock at send and during
+  - [x] `harness/sweep.py`: periods per model, waits for an idle GPU before each step
+  - [ ] Sweeps: smolvla, pi05 (back to back, 0.2, 0.5, 1, 3 s x 1000), a1 (back to back, 3, 10, 30 s)
+  - [ ] If clocks explain it: confirm with a short GPU warm-up burst before each arrival
+- [x] Throughput run at saturation; report requests/s (0.62 requests/s, a1-throughput-20261012-193543)
 
 ## Step 4: B1 LeRobot on synthetic observations
 - [x] Decide torch 2.10 vs 2.11: torch 2.10, no `dataset` extra, so no torchcodec

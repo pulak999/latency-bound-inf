@@ -1,9 +1,12 @@
-"""What the device is doing during a run: power, co-tenants, power mode.
+"""What the device is doing during a run: power, clocks, co-tenants, power mode.
 
-Power comes straight from the board's power sensors in sysfs, read on the same
-monotonic clock as the requests. tegrastats is also kept running for clocks and
-temperatures, but its log has one-second timestamps, too coarse to attribute
-energy to a single request.
+Power and clocks come straight from sysfs, read every 10 ms on the same
+monotonic clock as the requests, so each request can be matched to the power
+it drew and the clock speed it ran at. tegrastats is also kept running for
+temperatures, but its log has one-second timestamps, too coarse for that.
+
+The GPU clock is not fixed: a governor (nvhost_podgov) raises it under load and
+lowers it when the GPU idles. Without sudo we cannot pin it, so we record it.
 """
 
 import asyncio
@@ -15,13 +18,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 HWMON = Path("/sys/class/hwmon")
+GPU_CLOCK_FILE = Path("/sys/class/devfreq/gpu-gpc-0/cur_freq")  # Hz
+MEMORY_CLOCK_FILE = Path("/sys/class/devfreq/bwmgr/cur_freq")  # Hz, external memory (EMC)
 
 
 @dataclass
-class PowerSample:
+class DeviceSample:
     t: float  # monotonic seconds
     gpu_w: float  # VDD_GPU rail
     board_w: float  # whole-board input (VIN)
+    # Clocks. None in runs recorded before clocks were sampled.
+    gpu_mhz: float | None = None
+    memory_mhz: float | None = None
 
 
 def _find_gpu_rail() -> tuple[Path, Path]:
@@ -43,32 +51,38 @@ def _find_board_power() -> Path:
     raise RuntimeError("No VIN power sensor found under /sys/class/hwmon")
 
 
-class PowerSampler:
-    """Background thread that samples GPU and board power every `interval_s` seconds.
+def _read_mhz(path: Path) -> float:
+    return int(path.read_text()) / 1e6
+
+
+class DeviceSampler:
+    """Background thread that samples power and clocks every `interval_s` seconds.
 
     Use as a context manager around the measured part of a run:
 
-        with PowerSampler() as power:
+        with DeviceSampler() as device:
             ...
-        power.write_csv(run_dir / "power.csv")
+        device.write_csv(run_dir / "device.csv")
     """
 
     def __init__(self, interval_s: float = 0.01):
         self.interval_s = interval_s
-        self.samples: list[PowerSample] = []
+        self.samples: list[DeviceSample] = []
         self._gpu_voltage_file, self._gpu_current_file = _find_gpu_rail()
         self._board_power_file = _find_board_power()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._sample_until_stopped, daemon=True)
 
-    def _read_once(self) -> PowerSample:
+    def _read_once(self) -> DeviceSample:
         millivolts = int(self._gpu_voltage_file.read_text())
         milliamps = int(self._gpu_current_file.read_text())
         board_microwatts = int(self._board_power_file.read_text())
-        return PowerSample(
+        return DeviceSample(
             t=time.monotonic(),
             gpu_w=millivolts * milliamps / 1e6,
             board_w=board_microwatts / 1e6,
+            gpu_mhz=_read_mhz(GPU_CLOCK_FILE),
+            memory_mhz=_read_mhz(MEMORY_CLOCK_FILE),
         )
 
     def _sample_until_stopped(self) -> None:
@@ -78,7 +92,7 @@ class PowerSampler:
             next_sample += self.interval_s
             self._stop.wait(max(0.0, next_sample - time.monotonic()))
 
-    def __enter__(self) -> "PowerSampler":
+    def __enter__(self) -> "DeviceSampler":
         self._thread.start()
         return self
 
@@ -89,15 +103,31 @@ class PowerSampler:
     def write_csv(self, path: Path) -> None:
         with path.open("w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["t", "gpu_w", "board_w"])
+            writer.writerow(["t", "gpu_w", "board_w", "gpu_mhz", "memory_mhz"])
             for s in self.samples:
-                writer.writerow([f"{s.t:.6f}", f"{s.gpu_w:.3f}", f"{s.board_w:.3f}"])
+                writer.writerow(
+                    [f"{s.t:.6f}", f"{s.gpu_w:.3f}", f"{s.board_w:.3f}", s.gpu_mhz, s.memory_mhz]
+                )
 
 
-def read_power_csv(path: Path) -> list[PowerSample]:
+def read_device_samples(run_dir: Path) -> list[DeviceSample]:
+    """Load a run's device samples. Older runs have power.csv, with no clock columns."""
+    path = run_dir / "device.csv"
+    if not path.exists():
+        path = run_dir / "power.csv"
+
+    def optional(value: str | None) -> float | None:
+        return float(value) if value else None
+
     with path.open() as f:
         return [
-            PowerSample(t=float(row["t"]), gpu_w=float(row["gpu_w"]), board_w=float(row["board_w"]))
+            DeviceSample(
+                t=float(row["t"]),
+                gpu_w=float(row["gpu_w"]),
+                board_w=float(row["board_w"]),
+                gpu_mhz=optional(row.get("gpu_mhz")),
+                memory_mhz=optional(row.get("memory_mhz")),
+            )
             for row in csv.DictReader(f)
         ]
 
