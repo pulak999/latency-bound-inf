@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Repository workflow
 
-Read `CONTRIBUTING.md` before opening an issue or pull request. Do not commit or push directly to `main`.
+Read `CONTRIBUTING.md` before opening an issue or pull request. Agents do not commit or push directly to `main`. The repository owner may.
 
 - Open an issue when scope, ownership, or the desired outcome needs discussion.
 - Open a pull request directly for a small, clear change. Use a draft pull request for early feedback.
@@ -13,4 +13,4 @@ Read `CONTRIBUTING.md` before opening an issue or pull request. Do not commit or
 - Keep each pull request focused. Explain what changed, why, how it was verified, and whether timing, scheduling, records, or reported metrics changed.
 - The assignee finishes the pull request. Request reviewers separately; assignment does not mean review.
 - Merging requires one approval, code-owner review, resolved conversations, and a squash merge.
-- GitHub branch protection enforces these rules.
+- GitHub branch protection enforces these rules for everyone except the repository owner.

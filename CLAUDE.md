@@ -60,14 +60,14 @@ Readability matters for `harness/` (reviewed and reused). `setup/` scripts only 
 
 ## Repository workflow
 
-Read `CONTRIBUTING.md` before changing how work is proposed or merged. Do not commit directly to `main`.
+Read `CONTRIBUTING.md` before changing how work is proposed or merged. Agents do not commit directly to `main`. The repository owner may push or merge directly.
 
 - Open an issue when scope, ownership, or the desired outcome needs discussion.
 - Open a pull request directly for a small, clear change. Use a draft pull request for early feedback.
 - Link planned work with `Closes #<issue-number>`.
 - A pull request needs one approval, including code-owner review, resolved conversations, and a squash merge.
 - The assignee finishes the pull request. Request reviewers separately; do not use assignment to mean review.
-- GitHub branch protection enforces these rules.
+- GitHub branch protection enforces these rules for everyone except the repository owner.
 
 ## Tests
 

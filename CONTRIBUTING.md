@@ -33,4 +33,4 @@ Changes to `main` should:
 - resolve review conversations;
 - be squash-merged.
 
-GitHub branch rules enforce this policy.
+The repository owner may push or merge to `main` directly. Other people and agents use a pull request. GitHub enforces the pull-request rules for everyone except the owner.
