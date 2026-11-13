@@ -28,7 +28,6 @@ Keep each pull request focused. Its description should say:
 Changes to `main` should:
 
 - use a pull request;
-- pass required checks;
 - receive one approval, including code-owner review;
 - resolve review conversations;
 - be squash-merged.
