@@ -71,5 +71,4 @@ Read `CONTRIBUTING.md` before changing how work is proposed or merged. Agents do
 
 ## Tests
 
-Unit tests in `harness/tests/` (pytest), run locally. CI (`.github/workflows/ci.yml`) runs lint,
-format and a clean-install `--help` check of each entry point; it cannot use the GPU.
+Unit tests in `harness/tests/` (pytest), run locally. They do not use the GPU.
