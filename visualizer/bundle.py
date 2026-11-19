@@ -136,29 +136,97 @@ def idle_ns(frame: list[tuple]) -> int:
     return idle
 
 
+TIME_TO_US = {"nsecond": 1e-3, "ns": 1e-3, "usecond": 1.0, "us": 1.0, "msecond": 1e3, "ms": 1e3}
+HZ_TO_MHZ = {"hz": 1e-6, "Hz": 1e-6, "khz": 1e-3, "Mhz": 1.0, "MHz": 1.0, "Ghz": 1e3, "GHz": 1e3}
+STALL_PREFIX = "smsp__pcsamp_warps_issue_stalled_"
+PIPE_METRIC = re.compile(r"^sm__inst_executed_pipe_([a-z_]+)\.avg\.pct_of_peak_sustained_active$")
+
+
+def summarize_ncu(header: list[str], units: list[str], data: list[list[str]]) -> dict:
+    """The few ncu numbers the viewer shows, averaged over the profiled launches.
+
+    Stall reasons are shares of all warp samples (each sample is one warp at one
+    moment, and the reason it could not issue, or `selected` if it issued).
+    """
+    column = {name: i for i, name in enumerate(header)}
+
+    def values(name: str) -> list[float]:
+        if name not in column:
+            return []
+        out = []
+        for row in data:
+            try:
+                out.append(float(row[column[name]].replace(",", "")))
+            except ValueError:
+                pass
+        return out
+
+    def mean(name: str, scale: float = 1.0) -> float | None:
+        xs = values(name)
+        return round(sum(xs) / len(xs) * scale, 3) if xs else None
+
+    def unit(name: str) -> str:
+        return units[column[name]] if name in column else ""
+
+    stalls = {
+        name.removeprefix(STALL_PREFIX): sum(values(name))
+        for name in header
+        if name.startswith(STALL_PREFIX) and not name.endswith("_not_issued")
+    }
+    samples = sum(stalls.values()) or 1.0
+    pipes = {m.group(1): mean(name) for name in header if (m := PIPE_METRIC.match(name))}
+    l2_sectors = mean("lts__t_sectors.sum")
+    return {
+        "launches": len(data),
+        "grid_blocks": values("launch__grid_size"),
+        "time_us": mean(
+            "gpu__time_duration.sum", TIME_TO_US.get(unit("gpu__time_duration.sum"), 1)
+        ),
+        "clock_mhz": mean(
+            "gpc__cycles_elapsed.avg.per_second",
+            HZ_TO_MHZ.get(unit("gpc__cycles_elapsed.avg.per_second"), 1),
+        ),
+        "sm_pct": mean("sm__throughput.avg.pct_of_peak_sustained_elapsed"),
+        "memory_pct": mean("gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed"),
+        "occupancy_pct": mean("sm__warps_active.avg.pct_of_peak_sustained_active"),
+        "theoretical_occupancy_pct": mean("sm__maximum_warps_per_active_cycle_pct"),
+        "waves": mean("launch__waves_per_multiprocessor"),
+        "occupancy_limits": {
+            limit: mean(f"launch__occupancy_limit_{limit}")
+            for limit in ("blocks", "registers", "shared_mem", "warps")
+        },
+        "issue_active_pct": mean("smsp__issue_active.avg.pct_of_peak_sustained_active"),
+        "warp_cycles_per_instruction": mean("smsp__average_warp_latency_per_inst_issued.ratio"),
+        "l1_hit_pct": mean("l1tex__t_sector_hit_rate.pct"),
+        "l2_hit_pct": mean("lts__t_sector_hit_rate.pct"),
+        "l2_mb": round(l2_sectors * 32 / 1e6, 1) if l2_sectors is not None else None,
+        "tensor_hmma_pct": mean(
+            "sm__inst_executed_pipe_tensor_subpipe_hmma.avg.pct_of_peak_sustained_active"
+        ),
+        "pipes_pct": dict(sorted(((p, v) for p, v in pipes.items() if v), key=lambda x: -x[1])),
+        "stalls_pct": {
+            reason: round(100 * count / samples, 1)
+            for reason, count in sorted(stalls.items(), key=lambda x: -x[1])
+            if count
+        },
+    }
+
+
 def read_ncu(bundle_dir: Path) -> dict:
-    """ncu results per kernel name, from the raw-page CSVs written by ncu_top_kernels.sh."""
+    """ncu summaries per kernel short name, from the raw-page CSVs of ncu_top_kernels.sh.
+
+    The raw CSVs and .ncu-rep files stay next to the bundle; only the summary goes in.
+    """
     results = {}
     for path in sorted((bundle_dir / "ncu").glob("*.raw.csv")):
         with path.open() as f:
-            rows = list(csv.DictReader(f))
-        if len(rows) < 2:
+            rows = list(csv.reader(f))
+        if len(rows) < 3:  # header, units, at least one launch
             continue
-        units, data = rows[0], rows[1:]  # ncu puts the units in the first data row
-        name = data[0].get("Kernel Name", path.stem)
-        metrics = {}
-        for key, value in data[0].items():
-            try:
-                metrics[key] = {"value": float(value.replace(",", "")), "unit": units.get(key, "")}
-            except (ValueError, AttributeError):
-                continue
-        stalls = {
-            key.removeprefix("smsp__pcsamp_warps_issue_stalled_").removesuffix(".sum"): m["value"]
-            for key, m in metrics.items()
-            if key.startswith("smsp__pcsamp_warps_issue_stalled_") and key.endswith(".sum")
-            and not key.endswith("_not_issued.sum")
-        }  # fmt: skip
-        results[name] = {"instances": len(data), "metrics": metrics, "stalls": stalls}
+        header, units, data = rows[0], rows[1], rows[2:]
+        summary = summarize_ncu(header, units, data)
+        summary["kernel"] = data[0][header.index("Kernel Name")][:300]
+        results[path.name.removesuffix(".raw.csv")] = summary
     return results
 
 

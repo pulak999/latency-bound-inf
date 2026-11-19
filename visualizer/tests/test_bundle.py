@@ -48,3 +48,24 @@ def test_frames_split_on_long_gaps_and_idle_counts_only_when_nothing_runs():
 def test_the_stream_that_embeds_patches_is_the_vision_encoder():
     kernels = [kernel(0, 1, "mul_mat_q", stream=17), kernel(2, 3, "im2col_kernel", stream=18)]
     assert label_streams(kernels) == {17: "language model", 18: "vision encoder"}
+
+
+def test_ncu_summary_averages_launches_and_turns_stall_samples_into_shares():
+    from visualizer.bundle import summarize_ncu
+
+    header = [
+        "Kernel Name", "gpu__time_duration.sum", "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+        "smsp__pcsamp_warps_issue_stalled_math_pipe_throttle",
+        "smsp__pcsamp_warps_issue_stalled_math_pipe_throttle_not_issued",
+        "smsp__pcsamp_warps_issue_stalled_long_scoreboard",
+        "sm__inst_executed_pipe_fma.avg.pct_of_peak_sustained_active",
+    ]  # fmt: skip
+    units = ["", "msecond", "%", "", "", "", "%"]
+    data = [["k", "40", "80", "30", "99", "10", "50"], ["k", "50", "90", "30", "99", "30", "60"]]
+    summary = summarize_ncu(header, units, data)
+    assert summary["launches"] == 2
+    assert summary["time_us"] == 45_000  # mean of 40 and 50 ms
+    assert summary["sm_pct"] == 85
+    # the _not_issued counters are a different view of the same samples and are left out
+    assert summary["stalls_pct"] == {"math_pipe_throttle": 60.0, "long_scoreboard": 40.0}
+    assert summary["pipes_pct"] == {"fma": 55.0}
