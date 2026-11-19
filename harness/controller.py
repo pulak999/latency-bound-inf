@@ -178,8 +178,7 @@ def run_cell(
         raise
     finally:
         manifest["wall_end"] = datetime.now().astimezone().isoformat(timespec="seconds")
-        manifest["frames_emitted"] = run.frames_emitted
-        manifest["frames_delivered"] = len(run.records)
+        manifest |= run.frame_counts()
         manifest["emitter_faults"] = [
             {"frame_id": f.frame_id, "late_s": round(f.late_s, 6)} for f in run.emitter_faults
         ]

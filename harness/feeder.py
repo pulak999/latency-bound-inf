@@ -82,6 +82,20 @@ class MailboxRun:
     emitter_faults: list[EmitterFault] = field(default_factory=list)
     frames_emitted: int = 0
 
+    def frame_counts(self) -> dict[str, int]:
+        """What became of the emitted frames. Only `frames_served` reached the model.
+
+        In a finished run emitted = served + overwritten + error. An interrupted
+        run can fall short by the frame that was in flight or still in the mailbox.
+        """
+        outcomes = [r.outcome for r in self.records]
+        return {
+            "frames_emitted": self.frames_emitted,
+            "frames_served": outcomes.count("ok"),
+            "frames_overwritten": outcomes.count("overwritten"),
+            "frames_error": outcomes.count("error"),
+        }
+
 
 async def run_mailbox(
     send_frame: SendFrame,
