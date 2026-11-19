@@ -2,6 +2,7 @@
 
 [x] = done, [ ] = still to do. issues are big stuff i can hand to people, prs are small fixes i push myself.
 when something lands, tick it and add the date. full drafts live in ~/Desktop/gh-drafts/.
+gates at a glance: pinned issue #16 (roadmap) on github, + the milestones page. update #16 when a gate changes.
 
 ## prs (small fixes -- local branches off deadline-harness, not pushed yet)
 - [ ] `record-scheduled-arrival` -- feeder now logs when a frame was *due*, not just when it fired. before this, mailbox cells threw the lateness away unless it was > 10% of T (2 s at T=20)!
