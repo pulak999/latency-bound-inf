@@ -34,6 +34,15 @@ no gate yet:
 - [ ] #9 profile requests end to end: nsys (system), ncu (all kernels) -- run ncu with sudo.
 - [ ] #13 containers + multi-tenant cells -- after #3, #6, #12. not before gate 4. (quick version done, see experiments)
 
+# visualizer (branch `visualizer`, #17 -- after the harness, #16)
+see where a frame's time goes on the GPU, keep every capture + our notes. `visualizer/README.md` has the commands.
+- [x] starter: capture (nsys), bundle.json, local viewer with notes (`python -m visualizer.serve`)
+- [x] first data: the vision encoder is 89% of a frame. one kernel (flash_attn_tile, 27 calls) is 69%!
+- [x] flash attention off -> 1.55 s to 1.17 s per frame, same answer
+- [ ] open the viewer once in a browser -- not seen rendered yet (no browser on the thor)
+- [ ] ncu on the top kernels (`sudo -E visualizer/scripts/ncu_top_kernels.sh <bundle>`) -- warp stalls
+- [ ] rest of the roadmap: #17
+
 # experiments
 github label `experiment`. each one: what we ran, what it said, what's next.
 

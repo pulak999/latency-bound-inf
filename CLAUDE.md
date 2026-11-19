@@ -24,6 +24,7 @@ Stack B (`run_b1.py`) keeps the older fixed-rate runner and shares records and r
 - `harness/` — feeder and mailbox, engines, device sampling, controller, reporter, gate checker. Python 3.12.
 - `configs/` — TOML cell matrices; every tunable lives here, not in code.
 - `setup/` — scripts that build engines and envs, and cut Sentinel-2 tiles.
+- `visualizer/` — kernel-level frame profiles (nsys, later ncu) saved as bundles, and a local viewer. Starter code; see `visualizer/README.md`.
 - Heavy artifacts never go in git. On the Thor they live under `/data/projects/rohan/{models,src,runs,tiles}`
   (`/data/projects/pulak/` is the colleague's tree: usable, not ours to change).
 
@@ -45,6 +46,8 @@ uv run python -m harness.controller configs/stack_a.toml --cells alone-T20 --max
 /data/projects/pulak/envs/lerobot/bin/python -m harness.run_b1 --policy smolvla latency  # Stack B
 uv run python -m harness.report <cell dir>                            # rebuild a report from logs
 uv run python -m harness.compare <cell dirs...> -o reports/<name>     # cells on one axis
+uv run python -m visualizer.capture configs/space_multitenancy.toml --name alone  # profile 5 frames
+uv run python -m visualizer.serve                                    # browse saved profiles
 ```
 
 `test_sleep_until_wakes_on_time_after_a_long_wait` can fail on macOS (timer jitter); it is a Linux check.

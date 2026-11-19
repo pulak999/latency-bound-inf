@@ -1,0 +1,90 @@
+:root {
+  --surface: #fcfcfb;
+  --panel: #f3f2ee;
+  --ink: #1f1f1e;
+  --muted: #6b6a64;
+  --grid: #e4e3de;
+  --accent: #2a78d6;
+  --idle: #d03b3b;
+  /* kernel families: reference categorical order, never cycled */
+  --f-attention: #2a78d6;
+  --f-matmul: #eb6834;
+  --f-normalization: #1baf7a;
+  --f-copy: #eda100;
+  --f-quantize: #e87ba4;
+  --f-elementwise: #008300;
+  --f-other: #9a998f;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #1a1a19; --panel: #242422; --ink: #f0efec; --muted: #a9a89f; --grid: #34332f;
+    --accent: #3987e5; --idle: #e66767;
+    --f-attention: #3987e5; --f-matmul: #d95926; --f-normalization: #199e70; --f-copy: #c98500;
+    --f-quantize: #d55181; --f-elementwise: #0ca30c; --f-other: #75746d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --surface: #1a1a19; --panel: #242422; --ink: #f0efec; --muted: #a9a89f; --grid: #34332f;
+  --accent: #3987e5; --idle: #e66767;
+  --f-attention: #3987e5; --f-matmul: #d95926; --f-normalization: #199e70; --f-copy: #c98500;
+  --f-quantize: #d55181; --f-elementwise: #0ca30c; --f-other: #75746d;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; display: grid; grid-template-columns: 300px 1fr; min-height: 100vh;
+       background: var(--surface); color: var(--ink); }
+@media (max-width: 800px) { body { grid-template-columns: 1fr; } }
+aside { background: var(--panel); padding: 16px; border-right: 1px solid var(--grid); }
+main { padding: 16px 24px; min-width: 0; }
+h1 { font-size: 18px; margin: 0 0 4px; }
+h2 { font-size: 20px; margin: 0; }
+h3 { font-size: 14px; margin: 24px 0 8px; font-weight: 600; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; font-weight: normal; }
+
+#bundle-list { list-style: none; padding: 0; margin: 12px 0 0; }
+#bundle-list li { padding: 8px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 4px; }
+#bundle-list li:hover { background: var(--grid); }
+#bundle-list li.selected { background: var(--surface); outline: 1px solid var(--grid); }
+#bundle-list .name { font-weight: 600; }
+#bundle-list .line { font-size: 12px; color: var(--muted); }
+
+#warnings { color: var(--idle); padding-left: 18px; margin: 6px 0 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;
+         margin-top: 16px; }
+.tile { background: var(--panel); border-radius: 8px; padding: 10px 12px; }
+.tile .label { font-size: 12px; color: var(--muted); }
+.tile .value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.bar { display: flex; height: 26px; border-radius: 4px; overflow: hidden; gap: 2px;
+       background: var(--surface); margin-bottom: 4px; }
+.bar div { height: 100%; min-width: 2px; }
+.bar-label { font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--ink); margin-top: 6px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px;
+                       border-radius: 2px; margin-right: 5px; background: var(--swatch);
+                       vertical-align: -1px; }
+
+#timeline-wrap { position: relative; }
+#timeline { width: 100%; height: 170px; display: block; background: var(--surface);
+            border: 1px solid var(--grid); border-radius: 6px; cursor: crosshair; }
+#tooltip { position: absolute; pointer-events: none; background: var(--panel); color: var(--ink);
+           border: 1px solid var(--grid); border-radius: 6px; padding: 6px 8px; font-size: 12px;
+           white-space: nowrap; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.control { font-weight: normal; font-size: 12px; margin-left: 12px; }
+
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--grid); }
+th { color: var(--muted); font-weight: 500; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.name { font-family: ui-monospace, monospace; font-size: 12px; max-width: 360px;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+textarea { width: 100%; background: var(--panel); color: var(--ink); border: 1px solid var(--grid);
+           border-radius: 6px; padding: 8px; font: inherit; }
+button { margin-top: 8px; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--grid);
+         background: var(--accent); color: white; cursor: pointer; }

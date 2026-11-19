@@ -56,6 +56,24 @@ class LlamaServerConfig:
         return f"http://127.0.0.1:{self.port}"
 
 
+def server_command(config: LlamaServerConfig) -> list[str]:
+    """The llama-server command line: one slot, no continuous batching, all layers on the GPU."""
+    return [
+        str(config.server_bin),
+        "--model",
+        str(config.model),
+        "--mmproj",
+        str(config.mmproj),
+        "--n-gpu-layers",
+        "99",
+        "--port",
+        str(config.port),
+        "--parallel",
+        "1",
+        "--no-cont-batching",
+    ]
+
+
 def docker_command(config: LlamaServerConfig, command: list[str]) -> list[str]:
     """`command` wrapped in `docker run`, with the build, CUDA and model mounted from the host.
 
@@ -90,20 +108,7 @@ class LlamaServer:
         self.process: subprocess.Popen | None = None
 
     def __enter__(self) -> "LlamaServer":
-        command = [
-            str(self.config.server_bin),
-            "--model",
-            str(self.config.model),
-            "--mmproj",
-            str(self.config.mmproj),
-            "--n-gpu-layers",
-            "99",
-            "--port",
-            str(self.config.port),
-            "--parallel",
-            "1",
-            "--no-cont-batching",
-        ]
+        command = server_command(self.config)
         if self.config.container is not None:
             command = docker_command(self.config, command)
             env = None  # the container gets its environment through `docker run -e`

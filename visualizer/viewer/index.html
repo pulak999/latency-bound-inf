@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Frame Profiles</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside id="library">
+    <h1>Frame profiles</h1>
+    <p class="muted">Saved captures, newest first.</p>
+    <ul id="bundle-list"></ul>
+  </aside>
+
+  <main id="detail">
+    <p class="muted" id="empty">Pick a profile on the left.</p>
+
+    <section id="bundle" hidden>
+      <header>
+        <h2 id="title"></h2>
+        <p class="muted" id="subtitle"></p>
+        <ul id="warnings"></ul>
+      </header>
+
+      <div class="tiles" id="tiles"></div>
+
+      <h3>Where a frame went</h3>
+      <div id="breakdown"></div>
+
+      <h3>Kernel timeline
+        <label class="control">frame <select id="frame-select"></select></label>
+        <span class="muted small">drag to zoom, double-click to reset</span>
+      </h3>
+      <div id="timeline-wrap">
+        <canvas id="timeline"></canvas>
+        <div id="tooltip" hidden></div>
+      </div>
+      <div class="legend" id="legend"></div>
+
+      <h3>Top kernels <span class="muted small">(waves = blocks / (SMs × blocks per SM), a model)</span></h3>
+      <table id="kernels">
+        <thead><tr>
+          <th>kernel</th><th>family</th><th>stream</th><th class="num">calls</th>
+          <th class="num">total ms</th><th class="num">% of frame</th><th class="num">mean ms</th>
+          <th class="num">blocks</th><th class="num">waves</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <h3>Notes <span class="muted small">(saved next to the raw files as notes.md)</span></h3>
+      <textarea id="notes" rows="6" placeholder="What did we learn from this capture?"></textarea>
+      <button id="save-notes">Save notes</button> <span class="muted small" id="notes-status"></span>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
