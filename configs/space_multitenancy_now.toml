@@ -1,0 +1,87 @@
+# Space use case, several VLM tenants on one GPU (branch space-multitenancy-v1).
+# Tenant 0 is measured through the mailbox at T = cadence_s; the others are the
+# same Gemma model in their own containers, loaded as the cell's `load` says.
+#
+#   uv run python -m harness.controller configs/space_multitenancy.toml --cells smoke-2-timeslice-steady
+#
+# load:     idle (resident, no requests) | steady | bursty | saturating
+#           steady and bursty have the same mean: one request per background_period_s,
+#           at random (Poisson) times so they never phase-lock with tenant 0
+#           (about half the GPU for one tenant alone); bursty sends burst_size back to back.
+# sharing:  timeslice (no MPS) | mps (one MPS server, all SMs) |
+#           mps-partitioned (equal static SM partitions, 2-SM chunks; 2 and 5 tenants split 20 SMs exactly)
+
+[harness]
+runs_dir = "/data/projects/rohan/runs/space-multitenancy-v1"
+warmup_frames = 2
+start_delay_s = 1.0
+emitter_max_late_fraction = 0.10
+sampler_interval_s = 0.01
+
+[model]
+name = "gemma-3-4b-it"
+quant = "QAT Q4_0"
+prompt = "Decide whether to keep or drop this satellite image for downlink. Drop it if it is mostly cloud or open water. Answer with exactly one word: keep or drop."
+max_tokens = 1
+labels = ["keep", "drop"]
+
+[llama_server]
+server_bin = "/data/projects/rohan/src/llama.cpp/build/bin/llama-server"
+model = "/data/projects/rohan/models/gemma-3-4b-it-qat-q4_0/gemma-3-4b-it-q4_0.gguf"
+mmproj = "/data/projects/rohan/models/gemma-3-4b-it-qat-q4_0/mmproj-model-f16-4B.gguf"
+port = 8091                 # tenant i listens on port + i
+request_timeout_s = 300
+
+[container]
+image = "lbi-llama-server:v1"   # setup/containers/llama-server.Dockerfile
+cuda_dir = "/usr/local/cuda-13.2"
+
+[tenancy]
+mps_dir = "~/.lbi-mps"      # short on purpose: MPS socket paths are limited to 108 bytes
+background_period_s = 3.0
+burst_size = 5
+
+[dummy]
+kind = "uniform"
+low_s = 0.2
+high_s = 2.0
+seed = 0
+
+[tiles]
+dir = "/data/projects/rohan/tiles"
+synthetic_count = 64
+image_size = 896
+
+
+[[cells]]
+id = "now-n1-alone"
+cadence_s = 6.0
+frames = 12
+placement = "container"
+
+[[cells]]
+id = "now-n3-saturating-timeslice"
+cadence_s = 6.0
+frames = 12
+tenants = 3
+load = "saturating"
+sharing = "timeslice"
+placement = "container"
+
+[[cells]]
+id = "now-n3-saturating-partitioned"
+cadence_s = 6.0
+frames = 12
+tenants = 3
+load = "saturating"
+sharing = "mps-partitioned"
+placement = "container"
+
+[[cells]]
+id = "now-n3-bursty-timeslice"
+cadence_s = 6.0
+frames = 12
+tenants = 3
+load = "bursty"
+sharing = "timeslice"
+placement = "container"

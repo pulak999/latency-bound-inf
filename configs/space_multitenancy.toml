@@ -263,3 +263,125 @@ tenants = 5
 load = "saturating"
 sharing = "mps"
 placement = "container"
+
+# ---- quick results: 1 and 3 tenants (run first) ----
+# T = 6 s is not a deadline: it only has to exceed the slowest service time
+# (~4.6 s expected with 3 tenants) so frames never queue. Deadlines are applied
+# to the logs afterwards. 3 tenants get 6 SMs each when partitioned; 2 SMs idle.
+
+[[cells]]
+id = "q-n1-alone"
+cadence_s = 6.0
+frames = 60
+placement = "container"
+
+[[cells]]
+id = "q-n3-steady-timeslice"
+cadence_s = 6.0
+frames = 60
+tenants = 3
+load = "steady"
+placement = "container"
+
+[[cells]]
+id = "q-n3-steady-partitioned"
+cadence_s = 6.0
+frames = 60
+tenants = 3
+load = "steady"
+sharing = "mps-partitioned"
+placement = "container"
+
+[[cells]]
+id = "q-n3-bursty-timeslice"
+cadence_s = 6.0
+frames = 60
+tenants = 3
+load = "bursty"
+placement = "container"
+
+[[cells]]
+id = "q-n3-bursty-partitioned"
+cadence_s = 6.0
+frames = 60
+tenants = 3
+load = "bursty"
+sharing = "mps-partitioned"
+placement = "container"
+
+[[cells]]
+id = "q-n3-saturating-timeslice"
+cadence_s = 6.0
+frames = 60
+tenants = 3
+load = "saturating"
+placement = "container"
+
+[[cells]]
+id = "q-n3-saturating-partitioned"
+cadence_s = 6.0
+frames = 60
+tenants = 3
+load = "saturating"
+sharing = "mps-partitioned"
+placement = "container"
+
+# ---- quick results at a real 3 s camera rate (same cells, T = 3 s) ----
+# Here a frame slower than 3 s delays or drops the next one, so misses can cascade.
+
+[[cells]]
+id = "q3-n1-alone"
+cadence_s = 3.0
+frames = 60
+placement = "container"
+
+[[cells]]
+id = "q3-n3-steady-timeslice"
+cadence_s = 3.0
+frames = 60
+tenants = 3
+load = "steady"
+placement = "container"
+
+[[cells]]
+id = "q3-n3-steady-partitioned"
+cadence_s = 3.0
+frames = 60
+tenants = 3
+load = "steady"
+sharing = "mps-partitioned"
+placement = "container"
+
+[[cells]]
+id = "q3-n3-bursty-timeslice"
+cadence_s = 3.0
+frames = 60
+tenants = 3
+load = "bursty"
+placement = "container"
+
+[[cells]]
+id = "q3-n3-bursty-partitioned"
+cadence_s = 3.0
+frames = 60
+tenants = 3
+load = "bursty"
+sharing = "mps-partitioned"
+placement = "container"
+
+[[cells]]
+id = "q3-n3-saturating-timeslice"
+cadence_s = 3.0
+frames = 60
+tenants = 3
+load = "saturating"
+placement = "container"
+
+[[cells]]
+id = "q3-n3-saturating-partitioned"
+cadence_s = 3.0
+frames = 60
+tenants = 3
+load = "saturating"
+sharing = "mps-partitioned"
+placement = "container"
