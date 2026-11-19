@@ -5,8 +5,9 @@ single slot, Gemma 3 4B QAT Q4_0 + f16 mmproj (symlinked from the colleague's do
 Prompt (DESIGN.md's proposal, in `configs/stack_a.toml`): "Decide whether to keep or drop this
 satellite image for downlink. Drop it if it is mostly cloud or open water. Answer with exactly one
 word: keep or drop." `max_tokens = 1`, temperature 0. 50 Sentinel-2 tiles (896x896, six regions,
-cut by `setup/tiles_sentinel2.py`), sent back to back by `harness.probe`. Per-request log:
-`gate2-probe-thor.jsonl`.
+cut by `setup/tiles_sentinel2.py`), sent back to back by `harness.probe`. Every request is a row of
+`requests.csv`: the tile, the SCL ground truth (`expected`), the one-token and four-token answers,
+client latency and the engine's prefill time in ms (the probe kept durations, not timestamps).
 
 | DESIGN.md gate 2 criterion | Result | Pass |
 |---|---|---|

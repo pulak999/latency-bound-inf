@@ -14,7 +14,7 @@ Two use cases on one NVIDIA Jetson AGX Thor (JetPack 7, CUDA 13.2, `sm_110`, 122
 
 `DESIGN.md` is the spec for Stack A: a fixed-rate frame stream through a depth-1 mailbox,
 one-token keep/drop answers, miss rate at deadline D applied to the log afterwards.
-Build order and gates are in DESIGN.md section 4; gate reports go in `reports/`.
+Build order and gates are in DESIGN.md section 4; gate and experiment results go in `results/`.
 Co-runners and power modes are later extensions; the config loader refuses cells that ask for them.
 Stack B (`run_b1.py`) keeps the older fixed-rate runner and shares records and reporting.
 
@@ -24,6 +24,7 @@ Stack B (`run_b1.py`) keeps the older fixed-rate runner and shares records and r
 - `harness/` — feeder and mailbox, engines, device sampling, controller, reporter, gate checker. Python 3.12.
 - `configs/` — TOML cell matrices; every tunable lives here, not in code.
 - `setup/` — scripts that build engines and envs, and cut Sentinel-2 tiles.
+- `results/` — one folder per question: raw measurements as tidy CSV, figures, README (`results/README.md`).
 - `visualizer/` — kernel-level frame profiles (nsys, later ncu) saved as bundles, and a local viewer. Starter code; see `visualizer/README.md`.
 - Heavy artifacts never go in git. On the Thor they live under `/data/projects/rohan/{models,src,runs,tiles}`
   (`/data/projects/pulak/` is the colleague's tree: usable, not ours to change).
@@ -44,8 +45,9 @@ uv run python -m harness.controller configs/gate1.toml --engine dummy  # gate 1,
 uv run python -m harness.gate1 runs/gate1-T1-<timestamp>              # gate 1 checks
 uv run python -m harness.controller configs/stack_a.toml --cells alone-T20 --max-minutes 90  # Stack A
 /data/projects/pulak/envs/lerobot/bin/python -m harness.run_b1 --policy smolvla latency  # Stack B
-uv run python -m harness.report <cell dir>                            # rebuild a report from logs
-uv run python -m harness.compare <cell dirs...> -o reports/<name>     # cells on one axis
+uv run python -m harness.report <cell dir> [--figures DIR]            # quick look at one raw cell, printed
+uv run python -m harness.collect <cell dirs...> -o results/<date>-<question>  # raw cells -> results folder
+uv run python -m harness.compare results/<date>-<question>           # table + miss-rate curves from results
 uv run python -m visualizer.capture configs/space_multitenancy.toml --name alone  # profile 5 frames
 uv run python -m visualizer.serve                                    # browse saved profiles
 ```
@@ -56,7 +58,8 @@ Readability matters for `harness/` (reviewed and reused). `setup/` scripts only 
 
 ## Conventions
 
-- Every cell writes `manifest.json`, `records.jsonl`, `power.csv`, `gpu_util.csv`, `tegrastats.log` and the report into its own directory; a rerun gets a new directory, nothing is overwritten.
+- Every cell writes `manifest.json`, `records.jsonl`, `power.csv`, `gpu_util.csv` and `tegrastats.log` into its own directory; a rerun gets a new directory, nothing is overwritten.
+- Store raw measurements, never statistics. Cell directories and `results/` folders hold timestamps and samples; p50, p99, miss rates, energy are computed offline from them (`harness/report.py`), so any new statistic can be computed later. No `summary.json`, no derived fields in `records.jsonl`, no hand-typed numbers in tables.
 - Every record carries engine, model, quant, power mode, co-tenant GPU processes at send time, and an `outcome` (`ok`, `overwritten`, `error`).
 - The feeder never waits for the model. Frames fire on a monotonic clock into a depth-1 mailbox; a replaced frame is a miss.
 - Stack A answers with one token (`max_tokens = 1`, temperature 0), so each request is pure prefill.

@@ -1,0 +1,59 @@
+{
+  "cell_id": "now-n3-bursty-timeslice",
+  "config_path": "configs/space_multitenancy_now.toml",
+  "config_sha256": "c651e1bc1251395fb66a70f4f6f57b3f27f82ec39da684e466f886bd16f8d782",
+  "harness_commit": "4d3ba4f-dirty",
+  "engine_kind": "llama",
+  "model": "gemma-3-4b-it",
+  "quant": "QAT Q4_0",
+  "model_file_sha256": "76aed0a8285b83102f18b5d60e53c70d09eb4e9917a20ce8956bd546452b56e2",
+  "prompt": "Decide whether to keep or drop this satellite image for downlink. Drop it if it is mostly cloud or open water. Answer with exactly one word: keep or drop.",
+  "max_tokens": 1,
+  "labels": [
+    "keep",
+    "drop"
+  ],
+  "tiles": "sentinel2:/data/projects/rohan/tiles",
+  "n_tiles": 83,
+  "cadence_s": 6.0,
+  "co_runner": "none",
+  "power_mode_requested": "current",
+  "power_mode_before": "120W",
+  "power_mode_during": "120W",
+  "warmup_frames": 2,
+  "frames_requested": 12,
+  "wall_start": "2026-11-19T15:22:20-05:00",
+  "device": {
+    "nvpmodel_q": "NV Power Mode: 120W\n1\n",
+    "jetson_release": null,
+    "nv_tegra_release": "# R39 (release), REVISION: 2.1, GCID: 46758480, BOARD: generic, EABI: aarch64, DATE: Fri Aug  7 05:54:22 AM UTC 2026\n# KERNEL_VARIANT: oot\nTARGET_USERSPACE_LIB_DIR=nvidia\nTARGET_USERSPACE_LIB_DIR_PATH=usr/lib/aarch64-linux-gnu/nvidia\n",
+    "nvidia_smi": "Thu Nov 19 15:22:21 2026       \n+-----------------------------------------------------------------------------------------+\n| NVIDIA-SMI 595.78                 Driver Version: 595.78         CUDA Version: 13.2     |\n+-----------------------------------------+------------------------+----------------------+\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n|                                         |                        |               MIG M. |\n|=========================================+========================+======================|\n|   0  NVIDIA Thor                    Off |   00000000:01:00.0 Off |                  N/A |\n| N/A   46C  N/A               2W /  N/A  | Not Supported          |      0%      Default |\n|                                         |                        |             Disabled |\n+-----------------------------------------+------------------------+----------------------+\n\n+-----------------------------------------------------------------------------------------+\n| Processes:                                                                              |\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n|        ID   ID                                                               Usage      |\n|=========================================================================================|\n|    0   N/A  N/A            2545      G   /usr/lib/xorg/Xorg                       18MiB |\n|    0   N/A  N/A            2622      G   /usr/bin/gnome-shell                      5MiB |\n+-----------------------------------------------------------------------------------------+\n"
+  },
+  "sensors": {
+    "gpu_power": true,
+    "board_power": true,
+    "gpu_clock": true
+  },
+  "tenancy": {
+    "tenants": 3,
+    "load": "bursty",
+    "background_period_s": 3.0,
+    "burst_size": 5,
+    "placement": "container",
+    "image": "lbi-llama-server:v1",
+    "sharing": "timeslice",
+    "sms_per_tenant": null,
+    "partitions": []
+  },
+  "engine": {
+    "name": "llama.cpp",
+    "version": "bee23322f1baa3d2dd16b8339bed6aff4a8eb663"
+  },
+  "wall_end": "2026-11-19T15:23:48-05:00",
+  "frames_emitted": 12,
+  "frames_served": 12,
+  "frames_overwritten": 0,
+  "frames_error": 0,
+  "emitter_faults": [],
+  "power_mode_after": "120W"
+}

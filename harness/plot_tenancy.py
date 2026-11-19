@@ -1,12 +1,12 @@
 """Miss rate against deadline, alone and with other tenants, from multi-tenant cell logs.
 
-    uv run python -m harness.plot_tenancy RUNS_DIR --prefix q- -o reports/space-multitenancy-quick
+    uv run python -m harness.plot_tenancy results/2026-11-19-space-multitenancy-initial
 
-Takes the newest directory of each cell id under RUNS_DIR that starts with
---prefix, and draws one figure with a panel per sharing mode (time-slicing,
-MPS partitions). Each panel has the alone cell and one line per background
-load, with the miss rate at every deadline applied to the logs afterwards.
-Writes the figure, the curves as CSV, and a summary table.
+Reads a results folder (harness/results.py) and draws, into its figures/, one
+figure with a panel per sharing mode (time-slicing, MPS partitions). Each panel
+has the alone cell and one line per background load, with the miss rate at
+every deadline applied to the raw requests here. Prints a summary table; every
+number in it is computed from the folder's tables, none is stored.
 
 A second figure, `timeline_bursty.png`, shows why the kinds of sharing differ:
 one bursty cell per kind of sharing, the neighbours' requests above the
@@ -14,8 +14,6 @@ measured tenant's frames, each frame coloured by whether it made the deadline.
 """
 
 import argparse
-import csv
-import json
 from pathlib import Path
 
 import matplotlib
@@ -24,7 +22,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from harness.records import read_records  # noqa: E402
+from harness import results  # noqa: E402
 from harness.report import miss_rate_at, wilson_interval  # noqa: E402
 
 # Reference categorical palette, fixed order; the alone baseline is neutral ink.
@@ -34,46 +32,40 @@ INK, MUTED, GRID, SURFACE = "#1f1f1e", "#6b6a64", "#e4e3de", "#fcfcfb"
 PANELS = [("timeslice", "Time-slicing (no MPS)"), ("mps-partitioned", "MPS, equal SM partitions")]
 
 
-def newest_cells(runs_dir: Path, prefix: str) -> dict[str, Path]:
-    """Cell id -> its newest directory (names are <cell id>-<YYYYmmdd-HHMMSS>)."""
-    cells: dict[str, Path] = {}
-    for path in sorted(runs_dir.glob(f"{prefix}*")):
-        if (path / "manifest.json").exists():
-            cells[path.name.rsplit("-", 2)[0]] = path  # sorted, so the newest wins
-    return cells
-
-
-def background_busy(cell_dir: Path, t_start: float, t_end: float) -> float | None:
+def background_busy(
+    neighbours: dict[int, list[dict]], t_start: float, t_end: float
+) -> float | None:
     """Mean share of the cell each background tenant spent inside a request."""
     shares = []
-    for log in sorted(cell_dir.glob("background-*.jsonl")):
+    for requests in neighbours.values():
         busy = 0.0
-        for line in log.read_text().splitlines():
-            request = json.loads(line)
-            busy += max(0.0, min(request["t_done"], t_end) - max(request["t_send"], t_start))
+        for r in requests:
+            busy += max(0.0, min(r["t_last_token"], t_end) - max(r["t_send"], t_start))
         shares.append(busy / (t_end - t_start))
     return float(np.mean(shares)) if shares else None
 
 
-def load_cell(cell_dir: Path) -> dict:
-    manifest = json.loads((cell_dir / "manifest.json").read_text())
-    records = read_records(cell_dir / "records.jsonl")
-    tenancy = manifest.get("tenancy", {})
+def load_cell(loaded: results.Results, cell: dict) -> dict:
+    """A cell's settings, its requests, and the statistics the figures and table need."""
+    name = cell["cell"]
+    records = loaded.records(name)
+    neighbours = loaded.neighbour_requests(name)
     t_start = min(r.t_arrival for r in records)
     t_end = max((r.t_last_token or r.t_arrival) for r in records)
     latencies = np.array([r.latency_s for r in records if r.latency_s is not None])
     return {
-        "dir": cell_dir,
+        "name": name,
         "records": records,
-        "tenants": tenancy.get("tenants", 1),
-        "load": tenancy.get("load", "none"),
-        "sharing": tenancy.get("sharing", "timeslice"),
-        "sms": tenancy.get("sms_per_tenant"),
-        "busy": background_busy(cell_dir, t_start, t_end),
+        "neighbours": neighbours,
+        "tenants": cell["tenants"],
+        "load": cell["load"] or "none",
+        "sharing": cell["sharing"] or "timeslice",
+        "sms": cell["sms_per_tenant"],
+        "busy": background_busy(neighbours, t_start, t_end),
         "p50_s": float(np.percentile(latencies, 50)) if len(latencies) else None,
         "p99_s": float(np.percentile(latencies, 99)) if len(latencies) else None,
         "n": len(records),
-        "cadence_s": manifest.get("cadence_s"),
+        "cadence_s": cell["cadence_s"],
         "overwritten": sum(r.outcome == "overwritten" for r in records),
     }
 
@@ -100,7 +92,6 @@ def plot(cells: list[dict], out: Path, max_deadline_s: float, mark_s: float | No
     deadlines = np.linspace(0.5, max_deadline_s, 300)
     alone = [c for c in cells if c["tenants"] == 1]
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.4), sharey=True, facecolor=SURFACE)
-    rows = []
     for ax, (sharing, title) in zip(axes, PANELS, strict=True):
         panel = alone + [c for c in cells if c["tenants"] > 1 and c["sharing"] == sharing]
         panel.sort(
@@ -111,10 +102,6 @@ def plot(cells: list[dict], out: Path, max_deadline_s: float, mark_s: float | No
             rate, low, high = curve(cell["records"], deadlines)
             ax.fill_between(deadlines, low * 100, high * 100, color=color, alpha=0.12, lw=0)
             ax.plot(deadlines, rate * 100, color=color, lw=2, label=label(cell))
-            if sharing == PANELS[0][0] or cell["tenants"] > 1:
-                rows += [
-                    [cell["dir"].name, sharing, d, r] for d, r in zip(deadlines, rate, strict=True)
-                ]
         sms = next((c["sms"] for c in panel if c["sms"]), None)
         ax.set_title(
             title + (f" ({sms} SMs each)" if sms else ""), color=INK, fontsize=11, loc="left"
@@ -155,12 +142,7 @@ def plot(cells: list[dict], out: Path, max_deadline_s: float, mark_s: float | No
         fontsize=8,
     )
     fig.tight_layout(rect=(0, 0.03, 1, 0.95))
-    out.mkdir(parents=True, exist_ok=True)
     fig.savefig(out / "miss_vs_deadline.png", dpi=160, facecolor=SURFACE)
-    with (out / "miss_vs_deadline.csv").open("w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["cell", "panel", "deadline_s", "miss_rate"])
-        writer.writerows(rows)
 
 
 SHARING_STYLE = {
@@ -192,12 +174,13 @@ def plot_timeline(cells: list[dict], out: Path, load: str, mark_s: float) -> Non
     for ax, cell in zip(axes, panels, strict=True):
         records = [r for r in cell["records"] if r.latency_s is not None]
         t0 = min(r.t_arrival for r in cell["records"])
-        logs = sorted(cell["dir"].glob("background-*.jsonl"))
-        lanes = [f"neighbour {i}" for i in range(len(logs), 0, -1)] + ["tenant 0 (measured)"]
-        for lane, log in zip(range(len(logs), 0, -1), logs, strict=True):
-            for line in log.read_text().splitlines():
-                request = json.loads(line)
-                start, end = request["t_send"] - t0, request["t_done"] - t0
+        neighbours = cell["neighbours"]
+        lanes = [f"neighbour {i}" for i in sorted(neighbours, reverse=True)] + [
+            "tenant 0 (measured)"
+        ]
+        for lane, requests in neighbours.items():
+            for request in requests:
+                start, end = request["t_send"] - t0, request["t_last_token"] - t0
                 ax.barh(lane, end - start, left=start, height=0.6, color=MUTED, alpha=0.55, lw=0)
         for r in records:
             missed = r.latency_s > mark_s
@@ -219,7 +202,7 @@ def plot_timeline(cells: list[dict], out: Path, load: str, mark_s: float) -> Non
                 fontsize=7.5,
             )
         ax.set_yticks(range(len(lanes) - 1, -1, -1), lanes)
-        ax.set_ylim(-1.0, len(logs) + 0.5)
+        ax.set_ylim(-1.0, len(neighbours) + 0.5)
         name, _ = SHARING_STYLE[cell["sharing"]]
         missed = sum(r.latency_s > mark_s for r in records)
         ax.set_title(
@@ -262,10 +245,10 @@ def plot_timeline(cells: list[dict], out: Path, load: str, mark_s: float) -> Non
     fig.savefig(out / f"timeline_{load}.png", dpi=160, facecolor=SURFACE)
 
 
-def summary_table(cells: list[dict]) -> str:
+def summary_table(cells: list[dict], mark_s: float) -> str:
     lines = [
         "| cell | tenants | sharing | neighbours | neighbours busy "
-        "| p50 (s) | p99 (s) | missed at 3 s | overwritten |",
+        f"| p50 (s) | p99 (s) | missed at {mark_s:g} s | overwritten |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
     for c in sorted(cells, key=lambda c: (c["tenants"], c["sharing"], c["load"])):
@@ -273,31 +256,29 @@ def summary_table(cells: list[dict]) -> str:
         sharing = c["sharing"] + (f" ({c['sms']} SMs)" if c["sms"] else "")
         p50 = f"{c['p50_s']:.2f}" if c["p50_s"] is not None else "-"
         p99 = f"{c['p99_s']:.2f}" if c["p99_s"] is not None else "-"
+        missed = miss_rate_at(c["records"], mark_s)
         lines.append(
-            f"| {c['dir'].name} | {c['tenants']} | {sharing} | {c['load']} | {busy} | "
-            f"{p50} | {p99} | {miss_rate_at(c['records'], 3.0):.0%} | {c['overwritten']}/{c['n']} |"
+            f"| {c['name']} | {c['tenants']} | {sharing} | {c['load']} | {busy} | "
+            f"{p50} | {p99} | {missed:.0%} | {c['overwritten']}/{c['n']} |"
         )
     return "\n".join(lines) + "\n"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("runs_dir", type=Path)
-    parser.add_argument("--prefix", default="q-")
+    parser.add_argument("folder", type=Path, help="a results folder written by harness.collect")
     parser.add_argument("--max-deadline", type=float, default=10.0)
     parser.add_argument("--mark", type=float, default=3.0, help="deadline to mark (s)")
-    parser.add_argument("-o", "--out", type=Path, required=True)
     args = parser.parse_args()
 
-    cells = [load_cell(d) for d in newest_cells(args.runs_dir, args.prefix).values()]
-    if not cells:
-        parser.error(f"no cells starting with {args.prefix!r} in {args.runs_dir}")
-    plot(cells, args.out, args.max_deadline, args.mark)
-    plot_timeline(cells, args.out, "bursty", args.mark)
-    table = summary_table(cells)
-    (args.out / "summary.md").write_text(table)
-    print(table)
-    print(f"figure: {args.out / 'miss_vs_deadline.png'}")
+    loaded = results.load(args.folder)
+    cells = [load_cell(loaded, c) for c in loaded.cells]
+    figures = args.folder / results.FIGURES
+    figures.mkdir(exist_ok=True)
+    plot(cells, figures, args.max_deadline, args.mark)
+    plot_timeline(cells, figures, "bursty", args.mark)
+    print(summary_table(cells, args.mark))
+    print(f"figures: {figures}")
 
 
 if __name__ == "__main__":

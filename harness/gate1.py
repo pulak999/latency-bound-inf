@@ -148,8 +148,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("cell_dir", type=Path)
     args = parser.parse_args()
-    result = check(args.cell_dir)
-    (args.cell_dir / "gate1.json").write_text(json.dumps(result, indent=2) + "\n")
+    result = check(args.cell_dir)  # printed, not written: the cell directory holds only raw logs
     print(json.dumps(result, indent=2))
     print("GATE 1", "PASS" if result["pass"] else "FAIL")
 

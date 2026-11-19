@@ -5,8 +5,9 @@
 
 For each cell the controller starts the samplers, starts the engine, sends the
 warm-up frames, runs the emitter through the mailbox for the cell's frames,
-stops everything, writes manifest.json, records.jsonl, power.csv, gpu_util.csv
-and tegrastats.log into runs/<cell id>-<timestamp>/, and reports.
+stops everything, and writes manifest.json, records.jsonl, power.csv, gpu_util.csv
+and tegrastats.log into runs/<cell id>-<timestamp>/. The cell directory holds only
+what was measured; the summary printed at the end is computed and not saved.
 
 Power modes and co-runners are later extensions. The config loader refuses a
 cell that asks for either, so a run never silently lacks what it was meant to have.

@@ -2,6 +2,9 @@
 
 One line per request. A run directory holds `records.jsonl`; the report reads
 only this file and the power samples, never the engine's own logs.
+
+The file holds what was measured. Latency, the miss flag and feeder lateness
+are properties computed on load, so they are never stored and never go stale.
 """
 
 import json
@@ -146,12 +149,7 @@ class RequestRecord:
 def write_records(path: Path, records: list[RequestRecord]) -> None:
     with path.open("w") as f:
         for record in records:
-            line = asdict(record) | {
-                "latency_s": record.latency_s,
-                "missed": record.missed,
-                "feeder_late_s": record.feeder_late_s,
-            }
-            f.write(json.dumps(line) + "\n")
+            f.write(json.dumps(asdict(record)) + "\n")
 
 
 def read_records(path: Path) -> list[RequestRecord]:
@@ -159,7 +157,7 @@ def read_records(path: Path) -> list[RequestRecord]:
     with path.open() as f:
         for line in f:
             fields = json.loads(line)
-            # Derived values are written for people reading the file; drop them on load.
+            # Files written before 2026-11-19 also stored these derived values; drop them.
             fields.pop("latency_s", None)
             fields.pop("missed", None)
             fields.pop("feeder_late_s", None)

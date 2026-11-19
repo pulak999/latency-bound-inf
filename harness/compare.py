@@ -1,10 +1,10 @@
-"""Put several cells on one axis.
+"""Put the cells of a results folder on one axis.
 
-    uv run python -m harness.compare runs/alone-T20-* runs/alone-T5-* -o reports/alone
+    uv run python -m harness.compare results/<YYYY-MM-DD>-<question>
 
-Writes miss_vs_deadline.png (one curve per cell) and summary.md (one row per
-cell) into the output directory. Every number comes from the cells' logs via
-harness.report; nothing is typed in.
+Prints a table with one row per cell and draws figures/miss_vs_deadline.png
+(one curve per cell). Every number is computed here from the folder's raw
+tables (harness.report does the arithmetic); the table is printed, not saved.
 """
 
 import argparse
@@ -15,7 +15,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from harness.report import load_cell, miss_rate_curve, report
+from harness import results
+from harness.report import miss_rate_at, miss_rate_curve, summarize
 
 COLUMNS = [
     ("cell", lambda s: s.get("cell_id") or s["run"]),
@@ -39,18 +40,27 @@ def summary_table(summaries: list[dict]) -> str:
     return "\n".join([header, rule, *rows]) + "\n"
 
 
-def plot_miss_rate_curves(cell_dirs: list[Path], path: Path) -> None:
+def cell_summary(loaded: results.Results, cell: dict) -> dict:
+    records = loaded.records(cell["cell"])
+    summary = {"run": cell["cell"], "cell_id": cell["cell_id"]}
+    summary |= summarize(records, loaded.power(cell["cell"]))
+    if cell["cadence_s"] is not None and records:
+        summary["miss_rate_at_cadence"] = round(miss_rate_at(records, cell["cadence_s"]), 4)
+    return summary
+
+
+def plot_miss_rate_curves(loaded: results.Results, path: Path) -> None:
     fig, ax = plt.subplots(figsize=(7, 4.5))
     longest = 0.0
     curves = []
-    for cell_dir in cell_dirs:
-        manifest, records, _ = load_cell(cell_dir)
+    for cell in loaded.cells:
+        records = loaded.records(cell["cell"])
         if not records:
             continue
-        period_s = manifest.get("period_s")
+        period_s = cell["cadence_s"]
         latencies = [r.latency_s for r in records if r.latency_s is not None]
         longest = max(longest, max(latencies, default=0.0), period_s or 0.0)
-        curves.append((manifest.get("cell_id") or cell_dir.name, records, period_s))
+        curves.append((cell["cell_id"] or cell["cell"], records, period_s))
     for label, records, period_s in curves:
         deadlines, rates = miss_rate_curve(records, longest * 1.5)
         (line,) = ax.plot(deadlines, rates, label=label)
@@ -68,17 +78,15 @@ def plot_miss_rate_curves(cell_dirs: list[Path], path: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("cell_dirs", nargs="+", type=Path)
-    parser.add_argument("-o", "--out", type=Path, required=True, help="output directory")
+    parser.add_argument("folder", type=Path, help="a results folder written by harness.collect")
     args = parser.parse_args()
-    args.out.mkdir(parents=True, exist_ok=True)
 
-    summaries = [report(d) for d in args.cell_dirs]
-    table = summary_table(summaries)
-    (args.out / "summary.md").write_text(table)
-    plot_miss_rate_curves(args.cell_dirs, args.out / "miss_vs_deadline.png")
-    print(table)
-    print(f"wrote {args.out}")
+    loaded = results.load(args.folder)
+    print(summary_table([cell_summary(loaded, c) for c in loaded.cells]))
+    figures = args.folder / results.FIGURES
+    figures.mkdir(exist_ok=True)
+    plot_miss_rate_curves(loaded, figures / "miss_vs_deadline.png")
+    print(f"figure: {figures / 'miss_vs_deadline.png'}")
 
 
 if __name__ == "__main__":

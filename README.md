@@ -22,9 +22,10 @@ uv run python -m harness.controller configs/gate1.toml --engine dummy   # ~4 min
 uv run python -m harness.gate1 runs/gate1-T1-<timestamp>  # checks (a) to (d) of DESIGN.md gate 1
 ```
 
-The cell's directory holds `manifest.json`, `records.jsonl` (one line per frame),
-`power.csv` (power and GPU clock at 10 ms), `gpu_util.csv`, `tegrastats.log`,
-`summary.json` and three plots: `latency_cdf.png`, `miss_vs_deadline.png`, `timeline.png`.
+The cell's directory holds only what was measured: `manifest.json`, `records.jsonl`
+(one line per frame), `power.csv` (power and GPU clock at 10 ms), `gpu_util.csv` and
+`tegrastats.log`. Statistics and plots are computed afterwards and never written into it
+(`harness.report <cell dir> --figures DIR` for a quick look).
 
 ## The real model
 
@@ -38,8 +39,9 @@ Then, with the GPU otherwise idle (`nvidia-smi --query-compute-apps=pid,process_
 
 ```bash
 uv run python -m harness.controller configs/stack_a.toml --cells alone-T20 --max-minutes 90
-uv run python -m harness.report  /data/projects/rohan/runs/alone-T20-<timestamp>     # rebuild from logs
-uv run python -m harness.compare /data/projects/rohan/runs/alone-T* -o reports/alone  # cells on one axis
+uv run python -m harness.report  /data/projects/rohan/runs/alone-T20-<timestamp>     # quick look, printed
+uv run python -m harness.collect /data/projects/rohan/runs/alone-T* -o results/<date>-alone  # raw -> results/
+uv run python -m harness.compare results/<date>-alone                                 # cells on one axis
 ```
 
 Every tunable (prompt, token cap, cadences, frame counts, warm-up, paths) is in
@@ -62,7 +64,8 @@ If `[tiles] dir` in the config does not exist, synthetic noise images are used i
 
 - `harness/` — feeder and mailbox, engines (`llama_server`, `dummy`), device sampling,
   controller, reporter, cross-cell comparison, gate-1 checker, tests.
-- `configs/` — cell matrices. `setup/` — build and data scripts. `reports/` — gate reports.
+- `configs/` — cell matrices. `setup/` — build and data scripts.
+- `results/` — one folder per question: raw measurements as CSV, figures, a README. See `results/README.md`.
 - Runs live outside git: `/data/projects/rohan/runs/` on the Thor, `runs/` locally.
 
 ## Timing semantics

@@ -16,7 +16,7 @@ same model, either bursty or saturating:
 
 Each neighbour has one request in flight at a time (one server slot) and its own client process.
 Config: `configs/space_multitenancy_now.toml`.
-Raw cells: `/data/projects/rohan/runs/space-multitenancy-v1/now-*`.
+Raw cells: `/data/projects/rohan/runs/space-multitenancy-v1/now-n*` (column `raw_dir` of `cells.csv`).
 
 | cell | tenants | sharing | neighbours busy | p50 (s) | p99 (s) | missed at 3 s |
 |---|---|---|---|---|---|---|
@@ -62,3 +62,16 @@ and the load differs between cells (one neighbour fired a single burst in both b
 
 Not yet: steady neighbours, the full 60-frame cells, 2 and 5 tenants (which split the SMs
 exactly), and a 3 s camera rate (T = 3 s), where slow frames would also delay the next one.
+
+## Data and how to rebuild
+
+Raw measurements only, as described in `harness/results.py`: `cells.csv` (what each cell ran),
+`requests.csv` (every request of tenant 0 and of both neighbours, raw monotonic timestamps),
+`co_tenants.csv`, `power.csv`, `gpu_util.csv` and `manifests/`. Every number above is computed
+from them; none is stored.
+
+```bash
+uv run python -m harness.collect /data/projects/rohan/runs/space-multitenancy-v1/now-n* \
+    -o results/2026-11-19-space-multitenancy-initial        # raw cells -> tables
+uv run python -m harness.plot_tenancy results/2026-11-19-space-multitenancy-initial  # figures + table
+```

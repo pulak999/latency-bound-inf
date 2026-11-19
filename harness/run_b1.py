@@ -6,8 +6,8 @@ Synthetic observation in, one action chunk out.
     python -m harness.run_b1 --policy pi05 throughput --duration 300
 
 Run with the LeRobot environment's Python (/data/projects/pulak/envs/lerobot).
-Output layout matches Stack A: run.json, records.jsonl, power.csv,
-tegrastats.log, summary.json, latency_cdf.png.
+Output layout matches Stack A: run.json, records.jsonl, power.csv and
+tegrastats.log. The summary is printed, not saved.
 """
 
 import argparse

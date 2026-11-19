@@ -23,3 +23,5 @@ jobs:
       - run: uv run python -m harness.controller --help
       - run: uv run python -m harness.gate1 --help
       - run: uv run python -m harness.compare --help
+      - run: uv run python -m harness.collect --help
+      - run: uv run python -m harness.plot_tenancy --help

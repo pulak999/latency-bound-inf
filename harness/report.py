@@ -1,10 +1,11 @@
-"""Turn a cell (or run) directory into numbers and plots, from the logs alone.
+"""Statistics and plots of one cell, computed from its raw logs and never stored with them.
 
-    uv run python -m harness.report /data/projects/rohan/runs/<cell>
+    uv run python -m harness.report /data/projects/rohan/runs/<cell> [--figures DIR]
 
 Reads records.jsonl, power.csv and manifest.json (or run.json from the older
-runner). Writes summary.json, latency_cdf.png, miss_vs_deadline.png and
-timeline.png next to them and prints the summary.
+runner) and prints the summary. With --figures, also draws latency_cdf.png,
+miss_vs_deadline.png and timeline.png into DIR. Nothing is written into the
+cell directory: it holds only what was measured.
 
 The deadline is applied here, not during the run: one log gives the miss rate
 at every deadline D, and the default reported D is the cadence T.
@@ -277,28 +278,30 @@ def load_cell(run_dir: Path) -> tuple[dict, list[RequestRecord], list[PowerSampl
     return manifest, records, power
 
 
-def report(run_dir: Path) -> dict:
-    """Summarize a directory, write summary.json and the plots, and return the summary."""
+def report(run_dir: Path, figures_dir: Path | None = None) -> dict:
+    """Summarize a directory and return the summary; draw the plots into figures_dir if given."""
     manifest, records, power = load_cell(run_dir)
     period_s = manifest.get("period_s")
 
     summary = {"run": run_dir.name, "cell_id": manifest.get("cell_id")} | summarize(records, power)
     if period_s is not None and records:
         summary["miss_rate_at_cadence"] = round(miss_rate_at(records, period_s), 4)
-    (run_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
 
-    if answered_records(records):
-        plot_latency_cdf(records, period_s, run_dir / "latency_cdf.png")
-        plot_miss_rate_vs_deadline(records, period_s, run_dir / "miss_vs_deadline.png")
+    if figures_dir is not None and answered_records(records):
+        figures_dir.mkdir(parents=True, exist_ok=True)
+        plot_latency_cdf(records, period_s, figures_dir / "latency_cdf.png")
+        plot_miss_rate_vs_deadline(records, period_s, figures_dir / "miss_vs_deadline.png")
         gpu_util = read_gpu_utilization_csv(run_dir / "gpu_util.csv")
-        plot_timeline(records, power, gpu_util, period_s, run_dir / "timeline.png")
+        plot_timeline(records, power, gpu_util, period_s, figures_dir / "timeline.png")
     return summary
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("run_dir", type=Path)
-    print(json.dumps(report(parser.parse_args().run_dir), indent=2))
+    parser.add_argument("--figures", type=Path, metavar="DIR", help="also draw the plots here")
+    args = parser.parse_args()
+    print(json.dumps(report(args.run_dir, args.figures), indent=2))
 
 
 if __name__ == "__main__":

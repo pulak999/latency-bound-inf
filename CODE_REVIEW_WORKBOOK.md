@@ -1007,13 +1007,14 @@ Alternative explanation:
 
 ```bash
 uv run python - <<'PY'
-import json
-from pathlib import Path
-rows = [json.loads(x) for x in Path("reports/gate2-probe-thor.jsonl").read_text().splitlines()]
+import csv
+rows = list(csv.DictReader(open("results/2026-11-04-gate2-real-model/requests.csv", newline="")))
+for r in rows:
+    r["latency_ms"], r["prompt_ms"] = float(r["latency_ms"]), float(r["engine_prompt_ms"])
 for r in rows:
     outside = r["latency_ms"] - r["prompt_ms"]
     if r["latency_ms"] > 2000:
-        print(r["tile"], r["latency_ms"], r["prompt_ms"], round(outside, 1))
+        print(r["tile_id"], r["latency_ms"], r["prompt_ms"], round(outside, 1))
 normal = [r for r in rows if r["latency_ms"] <= 2000]
 slow = [r for r in rows if r["latency_ms"] > 2000]
 for name, group in [("normal", normal), ("slow", slow)]:
@@ -1483,9 +1484,9 @@ git show main:harness/sweep.py
 ### Raw committed gate data
 
 ```bash
-less reports/gate2-probe-thor.jsonl
-cat reports/gate1-dummy-thor.json
-cat reports/gate1-dummy-mac.json
+column -s, -t results/2026-11-04-gate2-real-model/requests.csv | less -S
+cat results/2026-11-04-gate1-dummy/checks-thor.json
+cat results/2026-11-04-gate1-dummy/checks-mac.json
 ```
 
 

@@ -4,8 +4,8 @@
     uv run python -m harness.run_a1 throughput --duration 300
 
 Each run gets its own directory under /data/projects/pulak/runs/ holding
-run.json (config), records.jsonl, power.csv, tegrastats.log, llama-server.log,
-and the report's summary.json and latency_cdf.png.
+run.json (config), records.jsonl, power.csv, tegrastats.log and llama-server.log.
+The summary is printed, not saved.
 """
 
 import argparse

@@ -47,7 +47,7 @@ see where a frame's time goes on the GPU, keep every capture + our notes. `visua
 github label `experiment`. each one: what we ran, what it said, what's next.
 
 ## space + multitenancy (branch `space-multitenancy-v1`, pushed)
-each VLM tenant is its own llama-server container. results + plots: `reports/space-multitenancy-initial/`.
+each VLM tenant is its own llama-server container. results + plots: `results/2026-11-19-space-multitenancy-initial/`.
 
 setup:
 - [x] container smoke test -- same speed as host (1.52 s back to back)

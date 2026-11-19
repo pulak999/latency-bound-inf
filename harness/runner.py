@@ -73,7 +73,7 @@ async def send_on_schedule(args: argparse.Namespace, send_one: SendOne) -> list[
 def measure_and_report(
     run_dir: Path, config: dict, measure: Callable[[], Awaitable[list[RequestRecord]]]
 ) -> None:
-    """Write the config, run `measure` while capturing power and tegrastats, then report."""
+    """Write the config, run `measure` capturing power and tegrastats, then print a summary."""
     config = config | {
         "harness_commit": harness_commit(),
         "started": datetime.now().isoformat(timespec="seconds"),
