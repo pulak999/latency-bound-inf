@@ -2,14 +2,19 @@
 
 The server runs one slot with continuous batching off, so each request is
 served alone and the latency we record is the engine's, not a batch's.
+
+It runs either as a host process or, with a `Container`, inside its own Docker
+container. A container mounts the same binary, CUDA libraries and model from
+the host, so the only difference between the two is the container itself.
 """
 
 import base64
 import json
+import os
 import subprocess
 import time
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
@@ -23,16 +28,55 @@ SERVER_BIN = LLAMA_CPP / "build/bin/llama-server"
 
 
 @dataclass
+class Container:
+    """Run the server in a container of this image, under this name."""
+
+    image: str
+    name: str
+    cuda_dir: Path  # the host's CUDA toolkit, mounted read-only
+
+    # Directories mounted read-write at the same path, e.g. the MPS pipe directory.
+    writable: tuple[Path, ...] = ()
+
+
+@dataclass
 class LlamaServerConfig:
     model: Path
     mmproj: Path
     port: int = 8081
     server_bin: Path = SERVER_BIN
     request_timeout_s: float = 300.0
+    container: Container | None = None
+
+    # Extra environment for the server, e.g. CUDA_MPS_PIPE_DIRECTORY.
+    env: dict[str, str] = field(default_factory=dict)
 
     @property
     def url(self) -> str:
         return f"http://127.0.0.1:{self.port}"
+
+
+def docker_command(config: LlamaServerConfig, command: list[str]) -> list[str]:
+    """`command` wrapped in `docker run`, with the build, CUDA and model mounted from the host.
+
+    Host network (no port mapping in the request path), host IPC and the
+    caller's user id (both needed for MPS clients to reach a host MPS daemon).
+    """
+    container = config.container
+    build_dir = config.server_bin.parent.parent
+    read_only = {build_dir, container.cuda_dir, config.model.parent, config.mmproj.parent}
+    libraries = [config.server_bin.parent, container.cuda_dir / "targets/sbsa-linux/lib"]
+    env = config.env | {"LD_LIBRARY_PATH": ":".join(str(p) for p in libraries)}
+    args = ["docker", "run", "--rm", "--name", container.name, "--runtime", "nvidia"]
+    args += ["--gpus", "all", "--network", "host", "--ipc", "host"]
+    args += ["--user", f"{os.getuid()}:{os.getgid()}"]
+    for path in sorted(read_only):
+        args += ["-v", f"{path}:{path}:ro"]
+    for path in container.writable:
+        args += ["-v", f"{path}:{path}"]
+    for key, value in sorted(env.items()):
+        args += ["-e", f"{key}={value}"]
+    return [*args, container.image, *command]
 
 
 class LlamaServer:
@@ -60,13 +104,30 @@ class LlamaServer:
             "1",
             "--no-cont-batching",
         ]
+        if self.config.container is not None:
+            command = docker_command(self.config, command)
+            env = None  # the container gets its environment through `docker run -e`
+        else:
+            env = os.environ | self.config.env
         self._log = self.logfile.open("w")
-        self.process = subprocess.Popen(command, stdout=self._log, stderr=subprocess.STDOUT)
-        self._wait_until_healthy()
+        self.process = subprocess.Popen(
+            command, stdout=self._log, stderr=subprocess.STDOUT, env=env
+        )
+        try:
+            self._wait_until_healthy()
+        except BaseException:
+            self.__exit__()
+            raise
         return self
 
     def __exit__(self, *exc) -> None:
-        self.process.terminate()
+        if self.config.container is not None:
+            # Stopping the `docker run` client would leave the container running.
+            subprocess.run(
+                ["docker", "stop", "--time", "10", self.config.container.name], capture_output=True
+            )
+        else:
+            self.process.terminate()
         self.process.wait()
         self._log.close()
 

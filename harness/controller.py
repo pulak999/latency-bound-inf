@@ -10,6 +10,10 @@ and tegrastats.log into runs/<cell id>-<timestamp>/, and reports.
 
 Power modes and co-runners are later extensions. The config loader refuses a
 cell that asks for either, so a run never silently lacks what it was meant to have.
+
+A cell can also put other VLM tenants on the GPU (harness/tenancy.py), each in
+its own container, sharing the GPU by time-slicing or MPS. The measured tenant
+runs on the host or in a container of its own (the cell's `placement`).
 """
 
 import argparse
@@ -39,24 +43,25 @@ from harness.mailbox import Frame
 from harness.records import RequestRecord, write_records
 from harness.report import report
 from harness.runner import harness_commit
+from harness.tenancy import Tenants, server_config
 from harness.tiles import Tile, load_tiles
 
 ENGINE_START_ALLOWANCE_S = 120  # model load, counted against --max-minutes
 
 
-def make_engine(kind: str, config: Config, cell_dir: Path) -> Engine:
+def make_engine(
+    kind: str,
+    config: Config,
+    cell_dir: Path,
+    container_name: str | None = None,
+    env: dict[str, str] | None = None,
+) -> Engine:
+    """The measured tenant's engine; in a container if `container_name` is given."""
     if kind == "dummy":
         return DummyEngine(config.dummy, label=config.model.labels[0])
     if config.llama_server is None:
         raise ValueError(f"{config.path} has no [llama_server] section")
-    settings = config.llama_server
-    server = llama_server.LlamaServerConfig(
-        model=settings.model,
-        mmproj=settings.mmproj,
-        port=settings.port,
-        server_bin=settings.server_bin,
-        request_timeout_s=settings.request_timeout_s,
-    )
+    server = server_config(config, config.llama_server.port, container_name, env or {})
     return llama_server.LlamaServer(server, logfile=cell_dir / "llama-server.log")
 
 
@@ -168,12 +173,19 @@ def run_cell(
         manifest["dummy"] = asdict(config.dummy)  # gate 1 replays these draws
     sampler = PowerSampler(config.harness.sampler_interval_s)
     manifest["sensors"] = sampler.sensors
+    tenants = Tenants(config, cell, cell_dir)
+    container_name = f"lbi-{cell.id}-tenant0" if cell.placement == "container" else None
     run = MailboxRun()
     try:
         with Tegrastats(cell_dir / "tegrastats.log"), GpuUtilization(cell_dir / "gpu_util.csv"):
-            with sampler, make_engine(engine_kind, config, cell_dir) as engine:
-                manifest["engine"] = {"name": engine.name, "version": engine.version}
-                asyncio.run(measure(engine, config, cell, tiles, run, stop_at))
+            with sampler, tenants:
+                manifest["tenancy"] = tenants.describe()
+                engine = make_engine(
+                    engine_kind, config, cell_dir, container_name, tenants.tenant0_env()
+                )
+                with engine:
+                    manifest["engine"] = {"name": engine.name, "version": engine.version}
+                    asyncio.run(measure(engine, config, cell, tiles, run, stop_at))
     except BaseException as exc:
         manifest["aborted"] = repr(exc)
         raise
