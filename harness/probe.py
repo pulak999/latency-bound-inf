@@ -3,8 +3,8 @@
     uv run python -m harness.probe configs/stack_a.toml [--n 10] [--tiles DIR]
 
 Starts the engine from the config, sends each tile once with the config's
-prompt, first with max_tokens = 1 (what the cells will do) and then with 4
-tokens (to see what the model wanted to say), and prints per request: the
+prompt with max_tokens = 1 (what the cells will do), then sends them all again
+with 4 tokens (to see what the model wanted to say), and prints per request: the
 one-token answer verbatim, whether it is one of the configured labels, the
 client latency, and the engine's prompt_ms. Ends with the spread of
 latencies after the first request and a verdict on the one-token rule.
@@ -58,22 +58,25 @@ async def probe(args: argparse.Namespace) -> None:
         bodies_4 = [engine.prepare(t.png, config.model.prompt, 4) for t in tiles]
         rows = []
         async with engine.session() as send:
-            for tile, body_1, body_4 in zip(tiles, bodies_1, bodies_4, strict=True):
+            # All the timed one-token requests first, back to back, as a cell sends them.
+            # The four-token requests only show what the model wanted to say; sending
+            # them in between would put a decode before every timed prefill.
+            for tile, body_1 in zip(tiles, bodies_1, strict=True):
                 t0 = time.monotonic()
                 one = await send(body_1)
-                latency_ms = (one.t_last_token - t0) * 1000
-                four = await send(body_4)
-                row = {
-                    "tile": tile.tile_id,
-                    "one_token": one.text,
-                    "is_label": one.text.strip().lower() in labels,
-                    "expected": expected.get(tile.tile_id),
-                    "four_tokens": four.text,
-                    "latency_ms": round(latency_ms, 1),
-                    "prompt_ms": one.engine_prompt_ms,
-                    "n_prompt_tokens": one.n_prompt_tokens,
-                }
-                rows.append(row)
+                rows.append(
+                    {
+                        "tile": tile.tile_id,
+                        "one_token": one.text,
+                        "is_label": one.text.strip().lower() in labels,
+                        "expected": expected.get(tile.tile_id),
+                        "latency_ms": round((one.t_last_token - t0) * 1000, 1),
+                        "prompt_ms": one.engine_prompt_ms,
+                        "n_prompt_tokens": one.n_prompt_tokens,
+                    }
+                )
+            for row, body_4 in zip(rows, bodies_4, strict=True):
+                row["four_tokens"] = (await send(body_4)).text
                 print(json.dumps(row))
 
     (log_dir / "probe.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
