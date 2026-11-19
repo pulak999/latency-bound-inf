@@ -1,7 +1,0 @@
-sharing,busy_neighbours,frames,mean_s
-timeslice,0,5,1.537
-timeslice,1,5,3.042
-timeslice,2,14,4.431
-mps-partitioned,0,1,4.393
-mps-partitioned,1,7,4.424
-mps-partitioned,2,16,4.461

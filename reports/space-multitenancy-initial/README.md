@@ -47,12 +47,10 @@ What it says so far:
 
 ## Why time-slicing is poor
 
-Two views of the same frames (pick one for slides):
-
-- `frame_time_by_busy_neighbours.png`: frames grouped by how many neighbours were inside a
-  request while they ran. Time-slicing: 1.5 s with none busy, 3.0 s with one, 4.4 s with two.
-- `timeline_bursty.png`: the two bursty cells over time, neighbours' requests above tenant 0's
-  frames. Under time-slicing the frames that land in a burst miss and the rest don't.
+`timeline_bursty.png`: the two bursty cells over time, neighbours' requests above tenant 0's
+frames. Under time-slicing the frames that land in a burst miss 3 s and the rest take 1.5 s
+(6 of 12 missed); under partitions every frame takes 4.4 s (12 of 12 missed). The two panels
+are separate runs, so the bursts do not line up between them.
 
 Under time-slicing a frame takes about alone × (1 + busy neighbours). The GPU takes turns between whoever has work,
 so one busy neighbour halves tenant 0's share. Twice the alone time is 3.06 s, so a 3 s

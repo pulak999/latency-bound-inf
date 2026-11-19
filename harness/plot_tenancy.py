@@ -8,10 +8,9 @@ MPS partitions). Each panel has the alone cell and one line per background
 load, with the miss rate at every deadline applied to the logs afterwards.
 Writes the figure, the curves as CSV, and a summary table.
 
-Two more figures explain the difference between the kinds of sharing:
-`frame_time_by_busy_neighbours.png` groups frames by how many neighbours were
-busy while they ran, and `timeline_bursty.png` shows one bursty cell per kind
-of sharing, the neighbours' requests above the measured tenant's frames.
+A second figure, `timeline_bursty.png`, shows why the kinds of sharing differ:
+one bursty cell per kind of sharing, the neighbours' requests above the
+measured tenant's frames, each frame coloured by whether it made the deadline.
 """
 
 import argparse
@@ -164,16 +163,6 @@ def plot(cells: list[dict], out: Path, max_deadline_s: float, mark_s: float | No
         writer.writerows(rows)
 
 
-def busy_neighbours(cell_dir: Path, t_start: float, t_end: float) -> float:
-    """Average number of neighbours inside a request between t_start and t_end."""
-    overlap = 0.0
-    for log in cell_dir.glob("background-*.jsonl"):
-        for line in log.read_text().splitlines():
-            request = json.loads(line)
-            overlap += max(0.0, min(t_end, request["t_done"]) - max(t_start, request["t_send"]))
-    return overlap / (t_end - t_start)
-
-
 SHARING_STYLE = {
     "timeslice": ("Time-slicing (no MPS)", "#2a78d6"),
     "mps-partitioned": ("MPS, equal SM partitions", "#eb6834"),
@@ -190,84 +179,6 @@ def style_axes(ax) -> None:
     for side in ("left", "bottom"):
         ax.spines[side].set_color(GRID)
     ax.tick_params(colors=MUTED)
-
-
-def ink_legend(ax, **kwargs) -> None:
-    legend = ax.legend(fontsize=8.5, facecolor=SURFACE, edgecolor=GRID, **kwargs)
-    for text in legend.get_texts():
-        text.set_color(INK)
-
-
-def frames_by_busy_neighbours(cells: list[dict], sharing: str) -> dict[int, list[float]]:
-    """Frame times of the multi-tenant cells, grouped by busy neighbours rounded to 0, 1 or 2."""
-    groups: dict[int, list[float]] = {0: [], 1: [], 2: []}
-    for cell in cells:
-        if cell["tenants"] == 1 or cell["sharing"] != sharing:
-            continue
-        for r in cell["records"]:
-            if r.latency_s is not None:
-                busy = busy_neighbours(cell["dir"], r.t_send, r.t_last_token)
-                groups[min(2, int(busy + 0.5))].append(r.latency_s)
-    return groups
-
-
-def plot_busy_bars(cells: list[dict], out: Path, mark_s: float | None) -> None:
-    """Mean frame time for 0, 1 and 2 busy neighbours, time-slicing next to partitions."""
-    fig, ax = plt.subplots(figsize=(7.5, 4.6), facecolor=SURFACE)
-    width = 0.36
-    nudge = np.random.default_rng(0)
-    rows = []
-    for offset, (sharing, (name, color)) in zip((-0.2, 0.2), SHARING_STYLE.items(), strict=True):
-        groups = frames_by_busy_neighbours(cells, sharing)
-        for busy, times in groups.items():
-            if not times:
-                continue
-            mean = float(np.mean(times))
-            x = busy + offset
-            ax.bar(x, mean, width, color=color, alpha=0.85, label=name if busy == 1 else None)
-            ax.scatter(
-                x + nudge.uniform(-0.08, 0.08, len(times)),
-                times,
-                s=12,
-                color=INK,
-                alpha=0.55,
-                lw=0,
-                zorder=3,
-            )
-            top = max(mean, max(times))  # above the highest dot, so dots never cover it
-            ax.text(x, top + 0.1, f"{mean:.1f} s", ha="center", color=INK, fontsize=9)
-            ax.text(x, 0.12, f"n={len(times)}", ha="center", color=SURFACE, fontsize=7.5)
-            rows.append([sharing, busy, len(times), round(mean, 3)])
-    if mark_s is not None:
-        ax.axhline(mark_s, color=MUTED, lw=1, ls=(0, (4, 3)))
-        ax.text(2.45, mark_s, f"{mark_s:g} s\ndeadline", color=MUTED, fontsize=8, va="center")
-    ax.set_xticks([0, 1, 2], ["none busy", "1 busy", "2 busy"])
-    ax.set_xlim(-0.55, 2.7)
-    ax.set_ylim(0, 5.3)
-    ax.set_xlabel("Neighbours inside a request while the frame ran", color=MUTED)
-    ax.set_ylabel("Time for the frame (s)", color=MUTED)
-    ax.set_title(
-        "Time-slicing slows a frame by one frame-time per busy neighbour",
-        color=INK,
-        fontsize=12,
-        loc="left",
-    )
-    style_axes(ax)
-    ink_legend(ax, loc="upper left")
-    fig.text(
-        0.01,
-        0.01,
-        "3 tenants, each in its own container; neighbours bursty or saturating. "
-        "Bars: mean; dots: single frames.",
-        color=MUTED,
-        fontsize=8,
-    )
-    fig.tight_layout(rect=(0, 0.03, 1, 1))
-    fig.savefig(out / "frame_time_by_busy_neighbours.png", dpi=160, facecolor=SURFACE)
-    with (out / "frame_time_by_busy_neighbours.csv").open("w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["sharing", "busy_neighbours", "frames", "mean_s"])
-        writer.writerows(rows)
 
 
 def plot_timeline(cells: list[dict], out: Path, load: str, mark_s: float) -> None:
@@ -382,7 +293,6 @@ def main() -> None:
     if not cells:
         parser.error(f"no cells starting with {args.prefix!r} in {args.runs_dir}")
     plot(cells, args.out, args.max_deadline, args.mark)
-    plot_busy_bars(cells, args.out, args.mark)
     plot_timeline(cells, args.out, "bursty", args.mark)
     table = summary_table(cells)
     (args.out / "summary.md").write_text(table)
