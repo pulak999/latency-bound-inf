@@ -40,7 +40,8 @@ see where a frame's time goes on the GPU, keep every capture + our notes. `visua
 - [x] first data: the vision encoder is 89% of a frame. one kernel (flash_attn_tile, 27 calls) is 69%!
 - [x] flash attention off -> 1.55 s to 1.17 s per frame, same answer
 - [ ] open the viewer once in a browser -- not seen rendered yet (no browser on the thor)
-- [ ] ncu on the top kernels (`sudo -E visualizer/scripts/ncu_top_kernels.sh <bundle>`) -- warp stalls
+- [x] ncu on the top kernels (2026-11-19): flash_attn_tile runs on the FMA pipe, tensor cores at 0%! warps wait for the math pipe, not memory (4%)
+- [ ] ncu on *typical* calls (not the first ones) + DRAM traffic via nsys `--soc-metrics` -- see #17
 - [ ] rest of the roadmap: #17
 
 # experiments
