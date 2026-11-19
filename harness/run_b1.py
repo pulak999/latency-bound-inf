@@ -89,7 +89,7 @@ async def measure(args: argparse.Namespace, policy, mode: str) -> list[RequestRe
 def main() -> None:
     args = parse_args()
 
-    # Imported here, not at the top, so `--help` works without LeRobot installed (CI).
+    # Imported here, not at the top, so `--help` works without LeRobot installed.
     import lerobot
 
     from harness.engines.lerobot_policy import LeRobotPolicy
