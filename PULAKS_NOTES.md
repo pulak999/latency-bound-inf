@@ -20,6 +20,7 @@ gate 3 (alone cells) -- do these first:
 - [ ] #5 say *why* each missed frame missed (overwritten / queued / model was slow + which part) -- after #4.
 - [ ] #7 find where stack A's ~180 ms outside the engine goes -- 11% of latency, stack B only loses 0.3 ms. so it's llama-server, not our asyncio.
 - [ ] #8 does the harness slow down what it measures? (sampler thread, nvidia-smi per request, feeder lateness under load) -- wait for review round 2.
+- [ ] #15 make the feeder wake up on time -- **next after #8**. it's ~0.7 ms late every tick, up to ~2 ms under load. fine for 3 s deadlines, ~6% of a 30 Hz robot tick!
 
 gate 4 (co-runners):
 - [ ] #12 co-runners light + heavy, as in DESIGN.md -- after #3.
@@ -80,4 +81,4 @@ initial naive results (2026-11-19, 1 vs 3 tenants, 12 frames per cell -- small!)
 - flame graphs per session/request: where each process spends its time --> #9
 - more verbose logging for deadline misses: why did it miss, where did it go off-course? --> #5
 - power matters for both the space and physical AI angles --> #10
-- feeder wakeup could be an issue, make it more deterministic --> pr `record-scheduled-arrival` (measure it) + #8 (fix it if needed). so far ~1 ms late, 2 ms worst, but only measured with nothing else running
+- feeder wakeup could be an issue, make it more deterministic --> pr `record-scheduled-arrival` (measure it) + #15 (fix it). 0.7 ms late every tick (0.4 ms OS wake-up + 0.3 ms asyncio), up to ~2 ms under load
