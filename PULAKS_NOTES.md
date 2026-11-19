@@ -27,11 +27,11 @@ gate 4 (co-runners):
 - [ ] #12 co-runners light + heavy, as in DESIGN.md -- after #3.
 
 gate 5 (power mode):
-- [ ] #10 power modes + energy per frame -- blocked on sudo. wait for review round 4.
+- [ ] #10 power modes + energy per frame -- wait for review round 4.
 
 no gate yet:
 - [ ] #6 run stack B (smolvla, pi0.5) through the controller -- the "clean loop" for the phys ai side. after #3.
-- [ ] #9 profile requests end to end: nsys (system), ncu (all kernels) -- ncu needs root on the thor.
+- [ ] #9 profile requests end to end: nsys (system), ncu (all kernels) -- run ncu with sudo.
 - [ ] #13 containers + multi-tenant cells -- after #3, #6, #12. not before gate 4. (quick version done, see experiments)
 
 # experiments
@@ -54,7 +54,7 @@ initial naive results (2026-11-19, 1 vs 3 tenants, 12 frames per cell -- small!)
 - [ ] #14 check *why* (SM sweep 10/6/4, nsys, memory bandwidth) -- **me**
 - [ ] steady neighbours, full 60-frame cells, 2 and 5 tenants (exact SM split)
 - [ ] real 3 s camera rate (T = 3 s), where a slow frame also delays the next one
-- [ ] pin the GPU clock (sudo?) before the real run
+- [ ] pin the GPU clock (`sudo jetson_clocks`) before the real run
 
 ## waiting on the review (rounds 2-5)
 - [ ] finish rounds 2-5
@@ -67,8 +67,6 @@ initial naive results (2026-11-19, 1 vs 3 tenants, 12 frames per cell -- small!)
 ## housekeeping
 - [ ] `uv run ruff format CODE_REVIEW_NOTES.md` when the review is done (a code block fails `ruff format --check`)
 - [ ] delete branches `drop-ci` and `repo-workflow-agent-notes` (already merged as #1, #2)
-- [ ] ask admin for sudo: nvpmodel, jetson_clocks, ncu (TODO.md step 0) -- blocks #9, #10
-- [ ] GPU booking convention with labmates (TODO.md step 0) -- the people side of #11
 
 ## parked
 - ZMQ instead of asyncio -- only if #7 or #8 says our side is the problem. right now it isn't.
