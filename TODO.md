@@ -8,8 +8,8 @@ Report latency percentiles (p50, p99) and throughput (requests/s, a plain rate; 
 Real data (Sentinel-2, LIBERO sim), co-located load and power-mode sweeps come later.
 
 ## Step 0: blockers (people, not code)
-- [ ] Agree GPU booking convention: `/data/gpu-lock` (owner, purpose, ETA) + post in `#latency-bound-inf`
-- [ ] Ask admin for sudo on `nvpmodel`, `jetson_clocks`, MIG (or a booked window)
+- [x] GPU booking convention: not needed, labmates coordinate fine (2026-11-19)
+- [x] sudo on the Thor: `nvpmodel`, `jetson_clocks`, ncu (2026-11-19)
 - [x] `hf auth login` with a token that has Gemma 3 access
 - [x] Fix the two command bugs in the plan (`--no-cont-batching`; no `pip install --user`)
 
@@ -70,5 +70,5 @@ Real data (Sentinel-2, LIBERO sim), co-located load and power-mode sweeps come l
 
 ## Step 3: A1 under load (slide 7)
 - [ ] Same run with co-located load
-- [ ] Same run at 70 W (needs sudo)
+- [ ] Same run at 70 W (`sudo nvpmodel`)
 - [ ] Three CDFs on shared axes

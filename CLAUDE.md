@@ -62,7 +62,7 @@ Readability matters for `harness/` (reviewed and reused). `setup/` scripts only 
 ## Key design decisions
 
 - The GPU is shared with labmates. Check `nvidia-smi --query-compute-apps` and `nvpmodel -q` before trusting any run.
-- Power mode and clocks need sudo (`nvpmodel`, `jetson_clocks`); not available yet.
+- Power mode and clocks need sudo (`nvpmodel`, `jetson_clocks`), which we have. Put the mode back after a run: the box is shared.
 - Record both client-side and engine-side timings; the gap is the transport/queue/Python share of latency.
 - Git push uses SSH (`git@github.com:pulak999/latency-bound-inf.git`); the HTTPS remote has no credentials.
 
