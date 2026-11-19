@@ -85,3 +85,12 @@ tenants = 3
 load = "bursty"
 sharing = "timeslice"
 placement = "container"
+
+[[cells]]
+id = "now-n3-bursty-partitioned"
+cadence_s = 6.0
+frames = 12
+tenants = 3
+load = "bursty"
+sharing = "mps-partitioned"
+placement = "container"
