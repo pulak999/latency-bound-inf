@@ -30,20 +30,29 @@ gate 5 (power mode):
 no gate yet:
 - [ ] #6 run stack B (smolvla, pi0.5) through the controller -- the "clean loop" for the phys ai side. after #3.
 - [ ] #9 profile requests end to end: nsys (system), ncu (all kernels) -- ncu needs root on the thor.
-- [ ] #13 containers + multi-tenant cells -- after #3, #6, #12. not before gate 4.
+- [ ] #13 containers + multi-tenant cells -- after #3, #6, #12. not before gate 4. (quick version done, see experiments)
 
-## experiment: space + multitenancy (branch `space-multitenancy-v1`)
-quick results for #12 / #13. each VLM tenant is its own llama-server container, tenant 0 is measured at T = 3 s.
+# experiments
+github label `experiment`. each one: what we ran, what it said, what's next.
+
+## space + multitenancy (branch `space-multitenancy-v1`, pushed)
+each VLM tenant is its own llama-server container. results + plots: `reports/space-multitenancy-initial/`.
+
+setup:
 - [x] container smoke test -- same speed as host (1.52 s back to back)
 - [x] MPS works on the thor. private daemon so labmates can't join it
 - [x] fair SM split = static MPS partitions, 2-SM chunks. 2 or 5 tenants split the 20 SMs exactly, 3 or 4 leave SMs idle
-- [x] harness: tenants / load / sharing per cell, background load in its own process -- 2 smoke cells pass
+- [x] harness: tenants / load / sharing per cell, background load in its own process
 - [x] found + fixed: periodic background load phase-locks with tenant 0 (same overlap every frame!). now random arrivals
-- [ ] agree the matrix (configs/space_multitenancy.toml, ~2.5 h of GPU)
-- [ ] write the predictions down before running
-- [ ] run it, make graph 1 (misses vs tenants) and graph 2 (misses vs deadline)
 
-first numbers: on a 6-SM partition (1/3 of the GPU) a frame takes 4.3 s instead of 1.5 s, even when the neighbours are idle.
+initial naive results (2026-11-19, 1 vs 3 tenants, 12 frames per cell -- small!):
+- [x] alone 1.55 s. 3 tenants, busy neighbours: ~4.5 s with time-slicing *or* partitions. everything misses 3 s
+- [x] time-slicing is poor: frame time = alone × (1 + busy neighbours). one busy neighbour = 3.06 s = miss at 3 s. bursty neighbours only 38% busy still made half the frames miss
+- [x] partitions isolate (4.39 vs 4.47 s whatever the neighbours do) but are slow all the time -- deterministic, at a price
+- [ ] #14 check *why* (SM sweep 10/6/4, nsys, memory bandwidth) -- **me**
+- [ ] steady neighbours, full 60-frame cells, 2 and 5 tenants (exact SM split)
+- [ ] real 3 s camera rate (T = 3 s), where a slow frame also delays the next one
+- [ ] pin the GPU clock (sudo?) before the real run
 
 ## waiting on the review (rounds 2-5)
 - [ ] finish rounds 2-5
