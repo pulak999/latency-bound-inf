@@ -48,6 +48,9 @@ def test_slow_model_leaves_overwritten_frames_and_keeps_every_frame_id():
 
     assert [r.req_id for r in run.records] == list(range(10))
     assert run.frames_emitted == 10
+    counts = run.frame_counts()
+    assert counts["frames_overwritten"] > 0
+    assert counts["frames_served"] + counts["frames_overwritten"] + counts["frames_error"] == 10
     outcomes = [r.outcome for r in run.records]
     assert outcomes[0] == "ok"
     assert "overwritten" in outcomes

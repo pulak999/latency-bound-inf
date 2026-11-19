@@ -93,7 +93,7 @@ One JSONL file per cell for frames, one for sampler rows, one for co-runner iter
 | outcome | enum | `ok`, `overwritten`, `error` |
 | error | string or null | Runtime error text if outcome is error |
 
-The manifest records: config hash, git commit of the harness, runtime name and version, model file hash, power mode before and during, co-runner setting, cadence, warm-up count, frames requested and delivered, wall-clock start and end, and the raw `nvpmodel -q` and `jetson_release` output.
+The manifest records: config hash, git commit of the harness, runtime name and version, model file hash, power mode before and during, co-runner setting, cadence, warm-up count, frames requested, emitted, served, overwritten and errored, wall-clock start and end, and the raw `nvpmodel -q` and `jetson_release` output.
 
 ### Data
 
