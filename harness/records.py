@@ -62,6 +62,11 @@ class RequestRecord:
     outcome: str = "ok"
     tile_id: str | None = None
 
+    # When the feeder meant the input to arrive. t_arrival is when it actually did,
+    # so t_arrival - t_scheduled is how late the feeder woke up. None for runs
+    # that only kept one of the two.
+    t_scheduled: float | None = None
+
     def __post_init__(self) -> None:
         if self.error is not None and self.outcome == "ok":
             self.outcome = "error"
@@ -70,7 +75,13 @@ class RequestRecord:
 
     @classmethod
     def overwritten(
-        cls, req_id: int, t_arrival: float, deadline: float | None, tile_id: str | None, **static
+        cls,
+        req_id: int,
+        t_arrival: float,
+        deadline: float | None,
+        tile_id: str | None,
+        t_scheduled: float | None = None,
+        **static,
     ) -> "RequestRecord":
         """The record of a frame the mailbox replaced before it was sent.
 
@@ -90,6 +101,7 @@ class RequestRecord:
             engine_decode_ms=None,
             outcome="overwritten",
             tile_id=tile_id,
+            t_scheduled=t_scheduled,
             **static,
         )
 
@@ -110,6 +122,13 @@ class RequestRecord:
         return self.t_last_token - self.t_arrival
 
     @property
+    def feeder_late_s(self) -> float | None:
+        """Scheduled to actual arrival: how late the feeder's tick fired."""
+        if self.t_scheduled is None:
+            return None
+        return self.t_arrival - self.t_scheduled
+
+    @property
     def waiting_s(self) -> float | None:
         """Arrival to send: time spent in the mailbox behind an earlier request."""
         if self.t_send is None:
@@ -127,7 +146,11 @@ class RequestRecord:
 def write_records(path: Path, records: list[RequestRecord]) -> None:
     with path.open("w") as f:
         for record in records:
-            line = asdict(record) | {"latency_s": record.latency_s, "missed": record.missed}
+            line = asdict(record) | {
+                "latency_s": record.latency_s,
+                "missed": record.missed,
+                "feeder_late_s": record.feeder_late_s,
+            }
             f.write(json.dumps(line) + "\n")
 
 
@@ -139,5 +162,6 @@ def read_records(path: Path) -> list[RequestRecord]:
             # Derived values are written for people reading the file; drop them on load.
             fields.pop("latency_s", None)
             fields.pop("missed", None)
+            fields.pop("feeder_late_s", None)
             records.append(RequestRecord(**fields))
     return records

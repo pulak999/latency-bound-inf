@@ -1,5 +1,6 @@
 import asyncio
 import time
+from itertools import pairwise
 
 from harness.feeder import run_mailbox
 from harness.mailbox import Frame
@@ -95,3 +96,27 @@ def test_stop_at_cuts_emission_short_and_fills_the_run_in_place():
     )
     assert result is run
     assert 3 <= run.frames_emitted <= 7
+
+
+def test_every_frame_records_when_it_was_due_served_or_overwritten():
+    period = 0.05
+
+    async def slow(frame: Frame) -> RequestRecord:
+        t_send = time.monotonic()
+        await asyncio.sleep(period * 2.5)
+        record = record_for(frame, t_send, time.monotonic())
+        record.t_scheduled = frame.t_scheduled
+        return record
+
+    run = asyncio.run(
+        run_mailbox(
+            slow, period, n_frames=8, tile_ids=["a"], overwritten_fields=STATIC, start_delay_s=0.0
+        )
+    )
+
+    assert {r.outcome for r in run.records} == {"ok", "overwritten"}
+    for record in run.records:
+        assert record.t_scheduled is not None
+        assert 0 <= record.feeder_late_s < period
+    due = [r.t_scheduled for r in run.records]
+    assert all(abs((b - a) - period) < 1e-9 for a, b in pairwise(due))

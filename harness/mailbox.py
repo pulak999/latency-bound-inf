@@ -21,6 +21,7 @@ class Frame:
     tile_id: str
     t_obs: float  # monotonic seconds, when the emitter published it
     deadline: float  # t_obs plus the cadence; applied to the log afterwards
+    t_scheduled: float | None = None  # monotonic seconds, when the tick was due
 
 
 class Mailbox:

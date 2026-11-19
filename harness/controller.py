@@ -111,6 +111,7 @@ async def measure(
                 co_tenants=await co_tenants,
                 error=error,
                 tile_id=frame.tile_id,
+                t_scheduled=frame.t_scheduled,
                 **static,
             )
 

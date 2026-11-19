@@ -1,5 +1,7 @@
 from harness.records import RequestRecord, read_records, write_records
 
+STATIC_FIELDS = {"engine": "e", "model": "m", "quant": "q", "power_mode": "p"}
+
 
 def test_records_round_trip_through_jsonl(tmp_path):
     original = [
@@ -126,3 +128,17 @@ def test_an_error_sets_the_outcome_and_old_lines_without_outcome_load():
         error="boom",
     )
     assert record.outcome == "error"
+
+
+def test_feeder_lateness_is_arrival_minus_schedule_and_old_lines_still_load(tmp_path):
+    late = RequestRecord.overwritten(
+        3, t_arrival=10.002, deadline=11.0, tile_id="t", t_scheduled=10.0, **STATIC_FIELDS
+    )
+    assert abs(late.feeder_late_s - 0.002) < 1e-9
+
+    path = tmp_path / "records.jsonl"
+    write_records(path, [late])
+    assert read_records(path) == [late]
+
+    old = RequestRecord.overwritten(4, t_arrival=11.0, deadline=12.0, tile_id="t", **STATIC_FIELDS)
+    assert old.t_scheduled is None and old.feeder_late_s is None

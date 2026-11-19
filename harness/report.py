@@ -95,6 +95,10 @@ def summarize(records: list[RequestRecord], power: list[PowerSample]) -> dict:
     by_outcome["overwritten"] = sum(r.outcome == "overwritten" for r in records)
     by_outcome["error"] = sum(r.outcome == "error" for r in records)
     summary = {"n_requests": len(records), "n_errors": by_outcome["error"], "outcomes": by_outcome}
+    # Every emitted frame, served or not: the feeder's lateness does not depend on the model.
+    feeder_late = [r.feeder_late_s for r in records if r.feeder_late_s is not None]
+    if feeder_late:
+        summary["feeder_late_ms"] = percentiles_ms(feeder_late)
     if not answered:
         return summary
 

@@ -115,7 +115,8 @@ async def run_mailbox(
             t_obs = time.monotonic()
             if t_obs - t_arrival > max_late_fraction * period_s:
                 run.emitter_faults.append(EmitterFault(frame_id, t_obs - t_arrival))
-            frame = Frame(frame_id, tile_ids[frame_id % len(tile_ids)], t_obs, t_obs + period_s)
+            tile_id = tile_ids[frame_id % len(tile_ids)]
+            frame = Frame(frame_id, tile_id, t_obs, t_obs + period_s, t_scheduled=t_arrival)
             run.frames_emitted += 1
             replaced = mailbox.put(frame)
             if replaced is not None:
@@ -125,6 +126,7 @@ async def run_mailbox(
                         replaced.t_obs,
                         replaced.deadline,
                         replaced.tile_id,
+                        t_scheduled=replaced.t_scheduled,
                         **overwritten_fields,
                     )
                 )
