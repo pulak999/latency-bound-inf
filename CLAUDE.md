@@ -68,4 +68,4 @@ Readability matters for `harness/` (reviewed and reused). `setup/` scripts only 
 
 ## Tests
 
-Unit tests under `harness/tests/` (`uv run pytest`). CI (`.github/workflows/ci.yml`) lints, installs and runs every `--help`.
+Unit tests under `harness/tests/` (`uv run pytest`), run locally. They do not use the GPU.
