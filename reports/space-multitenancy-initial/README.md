@@ -45,11 +45,16 @@ What it says so far:
   time-slicing does not.
 - At a 3 s deadline everything misses with 3 busy tenants, under either kind of sharing.
 
-## Why time-slicing is poor (`latency_vs_busy_neighbours.png`)
+## Why time-slicing is poor
 
-Each of tenant 0's frames plotted against how many neighbours were inside a request while
-it ran. Under time-slicing the points follow alone × (1 + busy neighbours): 1.53 s with
-none, about 3.0 s with one, 4.5 s with two. The GPU takes turns between whoever has work,
+Two views of the same frames (pick one for slides):
+
+- `frame_time_by_busy_neighbours.png`: frames grouped by how many neighbours were inside a
+  request while they ran. Time-slicing: 1.5 s with none busy, 3.0 s with one, 4.4 s with two.
+- `timeline_bursty.png`: the two bursty cells over time, neighbours' requests above tenant 0's
+  frames. Under time-slicing the frames that land in a burst miss and the rest don't.
+
+Under time-slicing a frame takes about alone × (1 + busy neighbours). The GPU takes turns between whoever has work,
 so one busy neighbour halves tenant 0's share. Twice the alone time is 3.06 s, so a 3 s
 deadline cannot absorb even one busy neighbour. Under equal partitions the frame takes
 4.39 to 4.47 s whatever the neighbours do. Why exactly is issue #14.
