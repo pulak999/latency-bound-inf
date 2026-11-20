@@ -56,7 +56,9 @@ see where a frame's time goes on the GPU, keep every capture + our notes. `visua
 
 # experiments
 
-github label `experiment`. each one: what we ran, what it said, what's next.
+github label `experiments`. **full list, space and physical ai separately: #20 (experiment tracker)**. each one: what we ran, what it said, what's next.
+
+- [ ] physical ai: decide what else runs on the soc next to the VLA (#20, P4). EdgePace (arXiv 2610.37307): on unified memory, bandwidth contention hurts, compute barely does
 
 ## space + multitenancy (branch `space-multitenancy-v1`, pushed)
 
