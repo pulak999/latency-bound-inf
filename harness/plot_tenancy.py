@@ -102,7 +102,7 @@ def legend_below(fig, ncol: int) -> None:
         labels,
         loc="lower center",
         ncol=ncol,
-        bbox_to_anchor=(0.5, 0.0),
+        bbox_to_anchor=(0.5, 0.055),
         handler_map={tuple: HandlerTuple(ndivide=None, pad=0.6)},
         handlelength=4.2,
         columnspacing=2.0,
@@ -210,7 +210,8 @@ def plot_miss_rates(cells: list[dict], out: Path, max_deadline_s: float, mark_s:
     axes[2].set_yticks([0, 25, 50, 75, 100])
     ps.panel_title(axes[2], "c", f"frames that miss $D$ = {mark_s:g} s (%)")
     legend_below(fig, 3)
-    fig.tight_layout(rect=(0, 0.1, 1, 1), w_pad=1.2)
+    ps.footnote(fig, ps.D_MEANS)
+    fig.tight_layout(rect=(0, 0.15, 1, 1), w_pad=1.2)
     ps.save(fig, out / "miss_rate_timeslice_vs_mps")
 
 
@@ -275,7 +276,8 @@ def plot_p99(cells: list[dict], out: Path, mark_s: float) -> None:
         )
     axes[0].set_ylabel("latency (s)")
     legend_below(fig, 3)
-    fig.tight_layout(rect=(0, 0.1, 1, 1), w_pad=1.5)
+    ps.footnote(fig, ps.D_MEANS)
+    fig.tight_layout(rect=(0, 0.15, 1, 1), w_pad=1.5)
     ps.save(fig, out / "p99_timeslice_vs_mps")
 
 
@@ -372,9 +374,10 @@ def plot_timeline(cells: list[dict], out: Path, load: str, mark_s: float) -> Non
         f"deadline of that frame ({ps.TO} + $D$)",
     ]
     fig.legend(
-        handles, labels, loc="lower center", ncol=4, bbox_to_anchor=(0.5, 0.0), handlelength=1.8
+        handles, labels, loc="lower center", ncol=4, bbox_to_anchor=(0.5, 0.055), handlelength=1.8
     )
-    fig.tight_layout(rect=(0, 0.08, 1, 1), h_pad=0.6)
+    ps.footnote(fig, ps.D_MEANS)
+    fig.tight_layout(rect=(0, 0.13, 1, 1), h_pad=0.6)
     ps.save(fig, out / f"timeline_{load}")
 
 

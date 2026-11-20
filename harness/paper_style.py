@@ -30,6 +30,13 @@ DEADLINE_LS = (0, (2, 1.5))  # dotted black: a deadline
 DASHES = [(0, (4, 2)), (0, (1.5, 1.5)), (0, (6, 2, 1.5, 2))]  # orange lines, in this order
 TO, TS, TE = r"$t_{\mathrm{obs}}$", r"$t_{\mathrm{start}}$", r"$t_{\mathrm{end}}$"
 
+# Say what the symbols mean in every figure that uses them.
+D_MEANS = (
+    r"$D$ = deadline: the most time a frame may take, from when it is observed ($t_{\mathrm{obs}}$)"
+    r" to when its answer arrives ($t_{\mathrm{end}}$)"
+)
+T_MEANS = r"$T$ = frame period: the time between two frames"
+
 
 def apply() -> None:
     plt.rcParams.update(
@@ -74,6 +81,20 @@ def panel_title(ax, letter: str, text: str) -> None:
 def swatch(fc: str, hatch: str | None = None, ec: str = "white") -> Rectangle:
     """A legend handle for a filled bar, hatched if `hatch` (orange = late)."""
     return Rectangle((0, 0), 1, 1, fc=fc, ec=ec, lw=0 if ec == "white" else LW, hatch=hatch)
+
+
+def footnote(fig, *lines: str) -> None:
+    """Small notes centred under everything else, e.g. what D and T mean."""
+    fig.text(
+        0.5,
+        0.012,
+        "\n".join(lines),
+        ha="center",
+        va="bottom",
+        fontsize=F_SMALL,
+        color=MUTED,
+        linespacing=1.3,
+    )
 
 
 def save(fig, path: Path) -> None:
