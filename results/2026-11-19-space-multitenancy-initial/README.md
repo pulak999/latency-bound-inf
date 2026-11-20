@@ -45,12 +45,26 @@ What it says so far:
   time-slicing does not.
 - At a 3 s deadline everything misses with 3 busy tenants, under either kind of sharing.
 
-## Why time-slicing is poor
+## Figures
 
-`timeline_bursty.png`: the two bursty cells over time, neighbours' requests above tenant 0's
-frames. Under time-slicing the frames that land in a burst miss 3 s and the rest take 1.5 s
-(6 of 12 missed); under partitions every frame takes 4.4 s (12 of 12 missed). The two panels
-are separate runs, so the bursts do not line up between them.
+All three in `figures/`, as .png and .pdf, in the paper style (`harness/paper_style.py`). Blue is
+tenant 0 alone; orange is tenant 0 with two neighbours (dashed line or diagonal hatch: time-slicing;
+dotted line or dots: MPS partitions, 6 SMs each). Suggested captions:
+
+**`miss_rate_timeslice_vs_mps`.** Deadline misses of a Gemma 3 4B tenant on the Jetson Thor, alone
+and with two neighbour tenants sharing the GPU by time-slicing or by equal MPS partitions.
+(a, b) Share of frames that miss a deadline $D$, as $D$ tightens, for bursty and for saturating
+neighbours. (c) The share that misses $D$ = 3 s. 12 frames per cell.
+
+**`p99_timeslice_vs_mps`.** Tail latency for the same cells. (a) p99 latency. (b) Every frame, with
+p50 (dotted) and p99 (solid); with 12 frames per cell, the p99 is close to the slowest frame.
+
+**`timeline_bursty`.** Why time-slicing is poor: the two bursty cells over time. Tenant 0's frames
+that overlap a neighbour's requests are late; the rest take the alone time. Under MPS partitions
+every frame takes the partitioned time, whatever the neighbours do. The panels are separate runs,
+so the bursts do not line up between them.
+
+## Why time-slicing is poor
 
 Under time-slicing a frame takes about alone × (1 + busy neighbours). The GPU takes turns between whoever has work,
 so one busy neighbour halves tenant 0's share. Twice the alone time is 3.06 s, so a 3 s

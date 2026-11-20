@@ -1,0 +1,83 @@
+"""One paper style for every figure, matching the 12 Nov meeting figures.
+
+    from harness import paper_style as ps
+    ps.apply()
+    fig, ax = plt.subplots(figsize=(ps.WIDTH_IN, 2.4))
+    ...
+    ps.save(fig, folder / "name")          # name.png (300 dpi) and name.pdf
+
+- 7 in wide (a two-column figure*), Liberation Serif to match a Times body,
+  7 to 8 pt text at final size, white background.
+- No headline inside the figure: the caption carries it. Panels are (a), (b), ...
+- Colour has one meaning everywhere: blue = baseline / on time, orange =
+  perturbed / late. Orange fills are hatched and orange lines are dashed, so
+  every figure survives greyscale print. Grey is context (neighbours, other jobs).
+"""
+
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+
+BLUE, ORANGE = "#2a78d6", "#eb6834"
+INK, MUTED, GRID, SHADE = "#1a1a1a", "#5c5c5c", "#d9d9d9", "#f1f1f1"
+CONTEXT = "#b3b3b3"  # neighbours and other jobs: present, but not the point
+WIDTH_IN = 7.0
+F_TITLE, F_TEXT, F_SMALL = 8.0, 7.0, 6.5
+LW = 0.8
+HATCH = "////"
+DEADLINE_LS = (0, (2, 1.5))  # dotted black: a deadline
+DASHES = [(0, (4, 2)), (0, (1.5, 1.5)), (0, (6, 2, 1.5, 2))]  # orange lines, in this order
+TO, TS, TE = r"$t_{\mathrm{obs}}$", r"$t_{\mathrm{start}}$", r"$t_{\mathrm{end}}$"
+
+
+def apply() -> None:
+    plt.rcParams.update(
+        {
+            "font.family": "Liberation Serif",
+            "mathtext.fontset": "stix",
+            "font.size": F_TEXT,
+            "axes.titlesize": F_TITLE,
+            "axes.titlelocation": "left",
+            "axes.titlepad": 4,
+            "axes.labelsize": F_TEXT,
+            "xtick.labelsize": F_TEXT,
+            "ytick.labelsize": F_TEXT,
+            "axes.edgecolor": INK,
+            "axes.labelcolor": INK,
+            "xtick.color": INK,
+            "ytick.color": INK,
+            "axes.linewidth": 0.6,
+            "xtick.major.width": 0.6,
+            "ytick.major.width": 0.6,
+            "xtick.major.size": 2.5,
+            "ytick.major.size": 2.5,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "grid.color": GRID,
+            "grid.linewidth": 0.4,
+            "axes.axisbelow": True,
+            "hatch.linewidth": 0.6,
+            "legend.fontsize": F_TEXT,
+            "legend.frameon": False,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+        }
+    )
+
+
+def panel_title(ax, letter: str, text: str) -> None:
+    """'(a) Time-slicing', bold letter, left-aligned above the axes."""
+    ax.set_title(f"({letter}) {text}", fontsize=F_TITLE, color=INK, loc="left", weight="bold")
+
+
+def swatch(fc: str, hatch: str | None = None, ec: str = "white") -> Rectangle:
+    """A legend handle for a filled bar, hatched if `hatch` (orange = late)."""
+    return Rectangle((0, 0), 1, 1, fc=fc, ec=ec, lw=0 if ec == "white" else LW, hatch=hatch)
+
+
+def save(fig, path: Path) -> None:
+    """Write path.png (300 dpi) and path.pdf (fonts embedded as TrueType)."""
+    fig.savefig(path.with_suffix(".png"), dpi=300, facecolor="white")
+    fig.savefig(path.with_suffix(".pdf"), facecolor="white")
+    plt.close(fig)
