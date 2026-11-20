@@ -23,7 +23,9 @@ The current repository is therefore both an experiment and a prototype of that f
 ### Review status
 
 - Round 1: completed and clarified below.
-- Rounds 2-5: pending.
+- Rounds 2-6: pending. Rounds 2-5 were refreshed on 2026-11-19 for the code merged in #18;
+  Round 6 (new) reviews the code written after Round 1: tenancy, MPS, background load,
+  results/, paper_style, visualizer.
 - Pre-merge recommendations: provisional until all rounds are complete.
 
 ### Evidence rule
@@ -1401,3 +1403,10 @@ A branch can improve one layer and regress another. Review should produce a capa
 - What is the minimum common runtime interface across llama.cpp, LeRobot, and future vLLM?
 - How should unexpected and controlled tenants be represented?
 - Which changes are true merge blockers versus follow-up milestones?
+
+### Round 6
+
+- Does every process a cell starts get stopped on every failure path (MPS daemon, load generators)?
+- Is "bursty time-slicing vs bursty MPS" a fair comparison when neighbours' achieved load differs?
+- When do visualizer bundles split frames wrongly, and which of their numbers are modeled?
+- What can the ncu summary support before the "typical calls" fix?
