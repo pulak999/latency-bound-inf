@@ -2,9 +2,10 @@
 
     uv run python -m harness.compare results/<YYYY-MM-DD>-<question>
 
-Prints a table with one row per cell and draws figures/miss_vs_deadline.png
-(one curve per cell). Every number is computed here from the folder's raw
-tables (harness.report does the arithmetic); the table is printed, not saved.
+Prints a table with one row per cell and draws figures/miss_vs_deadline.png and
+.pdf (one curve per cell, in the paper style of harness/paper_style.py). Every
+number is computed here from the folder's raw tables (harness.report does the
+arithmetic); the table is printed, not saved.
 """
 
 import argparse
@@ -15,6 +16,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from harness import paper_style as ps
 from harness import results
 from harness.report import miss_rate_at, miss_rate_curve, summarize
 
@@ -49,31 +51,76 @@ def cell_summary(loaded: results.Results, cell: dict) -> dict:
     return summary
 
 
+def is_alone(cell: dict) -> bool:
+    return (cell.get("tenants") or 1) == 1 and (cell.get("load") or "none") == "none"
+
+
 def plot_miss_rate_curves(loaded: results.Results, path: Path) -> None:
-    fig, ax = plt.subplots(figsize=(7, 4.5))
-    longest = 0.0
+    """Share of frames that miss each deadline D, one line per cell, in the paper style.
+
+    Blue and orange keep their one meaning: if the folder has exactly one cell
+    running alone and the others have neighbours, alone is blue and the rest are
+    orange. Otherwise (e.g. a sweep over T) every cell is black, told apart by its
+    dash pattern. Each cell's frame period T is marked with a dotted line.
+    """
+    ps.apply()
     curves = []
+    longest = 0.0
     for cell in loaded.cells:
         records = loaded.records(cell["cell"])
         if not records:
             continue
-        period_s = cell["cadence_s"]
         latencies = [r.latency_s for r in records if r.latency_s is not None]
-        longest = max(longest, max(latencies, default=0.0), period_s or 0.0)
-        curves.append((cell["cell_id"] or cell["cell"], records, period_s))
-    for label, records, period_s in curves:
+        longest = max(longest, max(latencies, default=0.0), cell["cadence_s"] or 0.0)
+        curves.append((cell, records))
+    alone = [cell for cell, _ in curves if is_alone(cell)]
+    colour_by_neighbours = len(alone) == 1 and len(curves) > 1
+
+    fig, ax = plt.subplots(figsize=(ps.COLUMN_IN, 2.4))
+    dashes = iter(ps.DASHES * len(curves))
+    for cell, records in curves:
         deadlines, rates = miss_rate_curve(records, longest * 1.5)
-        (line,) = ax.plot(deadlines, rates, label=label)
-        if period_s is not None:
-            ax.axvline(period_s, color=line.get_color(), linestyle=":", alpha=0.6)
-    ax.set_xlabel("deadline D (s); dotted lines are each cell's cadence")
-    ax.set_ylabel("miss rate")
-    ax.set_ylim(0, 1.01)
-    ax.grid(alpha=0.3)
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(path, dpi=150)
-    plt.close(fig)
+        if colour_by_neighbours and is_alone(cell):
+            colour, style = ps.BLUE, "-"
+        else:
+            colour, style = (ps.ORANGE if colour_by_neighbours else ps.INK), next(dashes)
+        ax.step(
+            deadlines,
+            100 * rates,
+            where="post",
+            color=colour,
+            ls=style,
+            lw=1.1,
+            label=cell["cell_id"] or cell["cell"],
+        )
+    for period_s in sorted({cell["cadence_s"] for cell, _ in curves if cell["cadence_s"]}):
+        ax.axvline(period_s, color=ps.INK, lw=ps.LW, ls=ps.DEADLINE_LS)
+        ax.text(
+            period_s,
+            1.0,
+            f" $T$ = {period_s:g} s",
+            transform=ax.get_xaxis_transform(),
+            ha="left",
+            va="top",
+            fontsize=ps.F_SMALL,
+            color=ps.INK,
+        )
+    ax.set_xlabel("deadline $D$ (s)")
+    ax.set_ylabel("frames that miss $D$ (%)")
+    ax.set_ylim(-2, 103)
+    ax.grid(axis="y")
+    fig.legend(
+        loc="lower center", ncol=2, bbox_to_anchor=(0.5, 0.0), fontsize=ps.F_SMALL, handlelength=2.6
+    )
+    rows = (len(curves) + 1) // 2
+    printed = ps.footnote(fig, ps.D_MEANS, ps.T_MEANS)
+    legend_in = 0.14 * rows
+    notes_in = 0.11 * printed
+    fig.set_figheight(2.2 + legend_in + notes_in)
+    for legend in fig.legends:
+        legend.set_bbox_to_anchor((0.5, notes_in / fig.get_figheight()))
+    fig.tight_layout(rect=(0, (legend_in + notes_in + 0.05) / fig.get_figheight(), 1, 1))
+    ps.save(fig, path)
 
 
 def main() -> None:
