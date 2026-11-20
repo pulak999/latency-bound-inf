@@ -38,6 +38,7 @@ no gate yet:
 
 - [ ] #6 run stack B (smolvla, pi0.5) through the controller -- the "clean loop" for the phys ai side. after #3.
 - [ ] #9 profile requests end to end: nsys (system), ncu (all kernels) -- run ncu with sudo.
+- [ ] #19 memory over time for any serving stack: held, allocated/freed, read/written. engine-agnostic format + adapters (ggml plan, pytorch snapshots). first look: llama.cpp reserves everything at load; inside a frame CUDA only sees one 35 MB pinned buffer
 - [ ] #13 containers + multi-tenant cells -- after #3, #6, #12. not before gate 4. (quick version done, see experiments)
 
 # visualizer (branch `visualizer`, #17 -- after the harness, #16)
@@ -50,6 +51,7 @@ see where a frame's time goes on the GPU, keep every capture + our notes. `visua
 - [ ] open the viewer once in a browser -- not seen rendered yet (no browser on the thor)
 - [x] ncu on the top kernels (2026-11-19): flash_attn_tile runs on the FMA pipe, tensor cores at 0%! warps wait for the math pipe, not memory (4%)
 - [ ] ncu on *typical* calls (not the first ones) + DRAM traffic via nsys `--soc-metrics` -- see #17 (was ticked by mistake, not done)
+- [ ] memory views (#17, data from #19): memory lane, block map, per-block verdicts -- accessed / accessed but not used / never freed
 - [ ] rest of the roadmap: #17
 
 # experiments
@@ -117,3 +119,10 @@ initial naive results (2026-11-19, 1 vs 3 tenants, 12 frames per cell -- small!)
 - more verbose logging for deadline misses: why did it miss, where did it go off-course? --> #5
 - power matters for both the space and physical AI angles --> #10
 - feeder wakeup could be an issue, make it more deterministic --> pr `record-scheduled-arrival` (measure it) + #15 (fix it). 0.7 ms late every tick (0.4 ms OS wake-up + 0.3 ms asyncio), up to ~2 ms under load
+
+## more raw notes
+- why do we even need --max-minutes? my reading is that the point of the montonic deadline is that a frame isnt sent while another one is being processed but isnt the frame consumed and converted to tokens sometime in the start? we are waiting on the vlm, so we can just replace the old frame right?
+- when do we do our measurement? and how do we make sure it does not affect the CPU processing being done.
+- the feeder should stay in fixed mode in general
+- the latency includes all of these: waiting in the mailbox, uploading the JSON body, the server's own prefill and decode, and the token traveling back.
+ 
