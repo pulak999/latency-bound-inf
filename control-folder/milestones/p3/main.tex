@@ -152,7 +152,7 @@ saturating    & MPS partitions & 4.45 & 4.52 & 12/12 \\
 %   Caveats to state: 12 frames, clock not pinned (alone cell started frames at
 %   315 MHz), ~80 s cells so a bursty neighbour fired only 1-5 bursts and load
 %   differs between cells.
-% Optional pilot (S6, no results folder yet): flash attention on vs off,
+% Optional pilot (S7, no results folder yet): flash attention on vs off,
 %   1.55 s -> 1.17 s per frame. Check the numbers before using.
 
 % =====================================================================
@@ -165,15 +165,15 @@ saturating    & MPS partitions & 4.45 & 4.52 & 12/12 \\
 % FACTS (issue #20 experiment tracker; pick what fits by Dec 7):
 %   S3 full matrix: 1/2/5 tenants x steady/bursty/saturating x time-slicing /
 %      MPS / MPS partitions, 60 frames, clock pinned, achieved neighbour load logged.
-%   S5 why partitions cost what they cost: alone on 10 / 6 / 4 SM partitions,
+%   S4 why partitions cost what they cost: alone on 10 / 6 / 4 SM partitions,
 %      nsys of one time-sliced and one partitioned cell (#14).
-%   S7 bandwidth-only co-runner: EdgePace found bandwidth, not compute, hurts on
+%   S6 bandwidth-only co-runner: EdgePace found bandwidth, not compute, hurts on
 %      unified memory -- separates SM contention from memory contention.
-%   P2 clock pinned vs not, for the idle-gap slowdown (SmolVLA 1.54x at 1 Hz).
+%   clock pinned vs not, for the idle-gap slowdown (SmolVLA 1.54x at 1 Hz).
 %   S8 a lower power mode (now possible with sudo).
 
 \pw{failure or boundary case}
-% FACTS: S4 -- T = 3 s, where a slow frame also delays/overwrites the next one
+% FACTS: S5 -- T = 3 s, where a slow frame also delays/overwrites the next one
 %   through the mailbox (cascading misses). Or: the tenant count where even
 %   partitions can't meet D.
 
