@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+@AGENTS.md
+
 ## Project
 
 Thesis work on latency-bound inference: when an edge GPU is given a deadline, where does inference miss it,
