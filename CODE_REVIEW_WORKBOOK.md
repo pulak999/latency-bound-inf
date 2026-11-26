@@ -49,11 +49,7 @@ Line references below refer to `deadline-harness` unless prefixed with `main:`. 
 
 ---
 
-
-
 ## System map: from thesis claim to recorded number
-
-
 
 ### The thesis-level model
 
@@ -120,11 +116,7 @@ These are the properties the rest of the workbook audits:
 
 ---
 
-
-
 ## Round 1 — Architecture and branch divergence
-
-
 
 ### Goal
 
@@ -151,8 +143,6 @@ git log --oneline --decorate --graph --all --max-count=10
 This matters because `deadline-harness` is not simply “main plus the new harness.” Both branches edited `device.py`, `feeder.py`, `records.py`, `report.py`, and tests independently.
 
 ### 1.2 What `deadline-harness` added
-
-
 
 #### Experiment authority and configuration
 
@@ -182,8 +172,6 @@ The gate checker is valuable because it tests system behavior against a model, n
 
 ### 1.3 What was left behind on `main`
 
-
-
 #### Stage-level tail attribution
 
 `main:harness/report.py` contains:
@@ -211,8 +199,6 @@ This probes the hypothesis that longer idle gaps let the GPU clock governor lowe
 The raw queue log `/data/projects/pulak/runs/sweeps-20261104.log` is also evidence of a design problem: the sweep waited for hours because processes *held GPU contexts*, regardless of whether they were actively using the GPU.
 
 ### 1.4 The two orchestration architectures
-
-
 
 #### v1: `runner.py` + stack-specific scripts
 
@@ -277,8 +263,6 @@ Use `deadline-harness` as the semantic base for the Stack A experiment because i
 
 A blind merge is risky. Both branches changed the same data path for different reasons, and accepting one side wholesale can silently restore queue semantics or discard deadline-aware CDF behavior.
 
-
-
 ### Question 2 — Is there one source of truth for “run an experiment”?
 
 Trace how a Stack A run and a Stack B run choose:
@@ -318,8 +302,6 @@ There are two sources of truth. A v1 “latency” run queues all arrivals and w
 
 That is acceptable during migration only if every report preserves the scheduling policy and schema version. Long term, lifecycle/configuration should be common while workload adapters and scheduling policy remain explicit plug-ins.
 
-
-
 ### Question 3 — Did `deadline-harness` improve or regress reporting?
 
 Give a two-column answer. A good systems review should resist reducing a branch to “better” or “worse.”
@@ -352,8 +334,6 @@ Lost: stage-level tail decomposition, per-request clock windows, explicit slowes
 
 The correct combined reporter needs both deadline semantics and causal attribution.
 
-
-
 ### Round 1 exit criterion
 
 Before moving on, you should be able to explain in two minutes:
@@ -364,17 +344,14 @@ Before moving on, you should be able to explain in two minutes:
 
 ---
 
-
-
 ## Round 2 — Timing critical path and observer effect
-
-
 
 ### Goal
 
 Trace every operation around the measured interval and distinguish intended system cost from harness-induced cost.
 
-> **Since this round was written (`c4a4e5f`):**
+> **Since this round was written (**`c4a4e5f`**):**
+>
 > - Frames and records now carry `t_scheduled` (the tick's due time) next to `t_arrival` (when it actually fired), and `RequestRecord.feeder_late_s` is their difference. Lateness below the 10%-of-T fault threshold used to be thrown away.
 > - Measured feeder lateness: about 0.7 ms on every tick in a quiet test (about 0.4 ms for the OS to wake a sleeping thread, plus about 0.3 ms from asyncio's millisecond timer), and up to about 2 ms under load. Issue #15 covers making it tighter; Question 4 below asks what the deadline should be anchored to.
 > - The controller can now start neighbour tenants and MPS around tenant 0 (`harness/tenancy.py`); Round 6 reviews that code. The timed path of tenant 0 itself is unchanged.
@@ -399,8 +376,6 @@ t_arrival                 t_send                         t_last_token
     ├──── mailbox wait ──────┼──── engine + transport ────────┤
     └──────────────────── total deadline latency ──────────────┘
 ```
-
-
 
 ### 2.2 Why `sleep_until` uses two sleeps
 
@@ -486,13 +461,13 @@ Suppose frames arrive at `0, 1, 2, 3, 4` seconds and every served frame takes `1
 **Your answer**
 
 ```text
-frame 0:
-frame 1:
-frame 2:
-frame 3:
-frame 4:
+frame 0: 0, 1.5, completes, miss
+frame 1: 1, 3, completes, miss
+frame 2: 2, -, replaced, miss
+frame 3: 3, 4.5, completes, miss
+frame 4: 4, 6, completes, miss
 
-Why:
+Why: i have assumed frames are fed every second and inference takes 1.5s. i have also assumed frame 2 gets overwritten...
 ```
 
 **How to verify**
@@ -513,8 +488,6 @@ The latencies are `1.5, 2.0, 2.5, None, 2.0`, so all five miss a one-second dead
 
 This distinction is why “fraction of service times longer than T” does not equal miss rate under queueing.
 
-
-
 ### Question 2 — Is `gpu_co_tenants()` inside or outside the measurement?
 
 Answer separately for:
@@ -529,7 +502,7 @@ Then propose the smallest experiment that would quantify the observer effect.
 **Your answer**
 
 ```text
-Mailbox wait:
+Mailbox wait: 
 
 Client latency:
 
@@ -553,8 +526,6 @@ Staff-engineer verdict
 The subprocess is scheduled after the frame has been taken and immediately before `t_send`, so it is not part of the recorded mailbox wait in the usual execution order. It can overlap client latency and alter CPU scheduling or driver activity. It is not included in llama.cpp's internal `prompt_ms`, but it may still affect that engine time indirectly through shared resources.
 
 A defensible A/B test runs the same seeded inputs and cadence with co-tenant sampling disabled versus enabled, recording at least 500 requests and comparing stage/tail distributions. A cheaper design is to sample GPU processes at cell boundaries and on detected anomalies, rather than spawning a process per request.
-
-
 
 ### Question 3 — Does `--max-minutes` mean what its name suggests?
 
@@ -593,8 +564,6 @@ The estimator returns `4520 s` (75.3 minutes): `(20 warm-up + 200 measured) × 2
 
 At a 72-minute budget the controller can skip a cell that would probably fit. This is safe but inconsistent with a precise scheduling tool. More serious is that the budget does not stop model hashing/startup/warm-up and lets a final request finish after `stop_at`.
 
-
-
 ### Question 4 — Should the deadline start at the scheduled tick or the actual one?
 
 `run_mailbox()` sets each frame's deadline to `t_obs + T`, where `t_obs` is when the tick actually fired. Since records now keep `t_scheduled` too, the deadline could instead be `t_scheduled + T`.
@@ -622,17 +591,13 @@ nl -ba harness/feeder.py | rg -C 3 "t_obs = |Frame\(|t_scheduled"
 nl -ba harness/records.py | rg -C 3 "t_scheduled|def feeder_late_s|def missed"
 ```
 
-<details><summary>Verdict</summary>
+Verdict
 
-- **From `t_obs`:** deadline at fired + 3 s; the frame finishes 2.999 s after firing, so it makes it.
-- **From `t_scheduled`:** deadline at due + 3 s; the frame finishes 2.001 + 2.999 = 3.001 s after the due time, so it misses.
+- **From** `t_obs`**:** deadline at fired + 3 s; the frame finishes 2.999 s after firing, so it makes it.
+- **From** `t_scheduled`**:** deadline at due + 3 s; the frame finishes 2.001 + 2.999 = 3.001 s after the due time, so it misses.
 - **The satellite's camera captures at its own scheduled instant.** The world's deadline starts when the observation happened, which the harness models as the scheduled tick; the feeder's lateness is a harness cost, not something the deployed system would have. So `t_scheduled + T` is the deployment deadline, and `t_obs + T` hides the feeder's own lateness from the miss rate.
 - **When it matters:** only when the feeder's lateness is a meaningful fraction of the slack. At T = 3 s and ~1 ms lateness it almost never changes a verdict; for a 30 Hz robot (33 ms period) a 2 ms late tick is 6% of the budget.
 - **What to record:** both times, which the records now do. The report can then score either rule after the fact, and should say which one it used.
-
-</details>
-
-
 
 ### Round 2 exit criterion
 
@@ -640,19 +605,16 @@ Draw the critical path from `t_obs` to `t_last_token` and mark every allocation,
 
 ---
 
-
-
 ## Round 3 — Engine adapters and hardware telemetry
-
-
 
 ### Goal
 
 Judge whether adapters expose the right abstraction and whether telemetry is sufficiently accurate without becoming a major workload itself.
 
-> **Since this round was written (`c4a4e5f`):**
+> **Since this round was written (**`c4a4e5f`**):**
+>
 > - `llama_server.py` gained `server_command()` and `docker_command()`: the same binary, CUDA libraries and model, mounted into a container, with host network and IPC (needed for MPS clients). Round 6 reviews it.
-> - **What `prompt_ms` contains:** the visualizer's first profiles show that llama-server's `prompt_ms` includes the **vision encoder**, which is about 89% of the GPU time of a frame. One kernel, `flash_attn_tile` (27 calls, one per encoder layer), is 69% of the frame and runs on the FMA pipe with the tensor cores idle. "Prefill" in this repo means vision encoder + language-model prefill.
+> - **What** `prompt_ms` **contains:** the visualizer's first profiles show that llama-server's `prompt_ms` includes the **vision encoder**, which is about 89% of the GPU time of a frame. One kernel, `flash_attn_tile` (27 calls, one per encoder layer), is 69% of the frame and runs on the FMA pipe with the tensor cores idle. "Prefill" in this repo means vision encoder + language-model prefill.
 > - The client-minus-engine gap the dual timing exposes is about 150–180 ms per frame for Stack A and 0.3 ms for Stack B in-process (issue #7). The dual timing did its job.
 > - Question 4 below (new) uses the multi-tenant results to test what the unpinned GPU clock does to a baseline.
 
@@ -670,8 +632,6 @@ This is a clean seam for Stack A because both dummy and llama-server can impleme
 It is not yet a generic inference protocol. `prepare(image_png, prompt, max_tokens)` and token-specific `Reply` encode VLM assumptions. The LeRobot adapter returns `ChunkReply` with `n_actions` and named stages (`lerobot_policy.py:24-29`) and is invoked directly by `run_b1.py`.
 
 ### 3.2 llama.cpp adapter
-
-
 
 #### Process lifecycle
 
@@ -695,8 +655,6 @@ Interpretation:
 - It may not represent an optimized deployment that legitimately caches a shared text prefix.
 - With `max_tokens=1`, `ignore_eos=True` has little practical effect.
 - With the four-token diagnostic request in `probe.py`, it forces continued output after EOS. That helps inspect continuation behavior but makes the probe request unlike the measured cell.
-
-
 
 #### Streaming timestamps
 
@@ -752,8 +710,6 @@ Trade-offs:
 - 100 Hz polling and CSV retention can consume CPU and memory during long cells;
 - mean power × duration is later used as energy, rather than time-aware trapezoidal integration.
 
-
-
 ### 3.6 What differs on `main`
 
 `main:harness/device.py` has:
@@ -803,8 +759,6 @@ Without synchronization, stage timers mostly measure CPU launch and enqueue time
 
 Synchronization makes stage attribution credible but forbids overlap. Keep a synchronized diagnostic mode and separately measure an optimized end-to-end mode if overlap is a research variable.
 
-
-
 ### Question 2 — Are `cache_prompt=False` and pre-encoding “fair”?
 
 Answer for two distinct claims:
@@ -837,8 +791,6 @@ Staff-engineer verdict
 For controlled engine prefill comparison, pre-encoding and disabling cache reuse are defensible: each request presents the same shape and pays full prefill.
 
 For deployed end-to-end latency, the measurement excludes image acquisition/decoding/serialization and deliberately rejects one optimization. It should be reported as “arrival-to-client completion with request bodies prepared,” with a separate pipeline measurement if end-to-end system latency is claimed.
-
-
 
 ### Question 3 — Is 100 Hz telemetry precise enough and cheap enough?
 
@@ -878,8 +830,6 @@ At 100 Hz, a 67-minute measured period produces roughly 402,000 samples. With fo
 
 That temporal resolution is likely adequate for request-scale energy and clock state, but it can miss short frequency or power transients. Do not optimize based on intuition alone: measure emitter jitter and latency with telemetry off, at 10 Hz, and at 100 Hz. The Gate 1 sampler gaps are useful initial evidence but do not quantify inference perturbation.
 
-
-
 ### Question 4 — What did the GPU clock do to the alone baseline?
 
 Predict, for the alone cell and for a cell with saturating neighbours: the GPU clock when a frame is sent, and during the frame. Then predict how pinning the clock would change the alone time and the measured slowdown from neighbours.
@@ -916,7 +866,7 @@ for c in r.cells:
 PY
 ```
 
-<details><summary>Verdict</summary>
+Verdict
 
 Measured on 2026-11-19:
 
@@ -929,8 +879,6 @@ With one frame every 6 s, the governor drops the GPU to its idle clock between f
 
 So the alone baseline is slowed by the governor and the neighbour cells are not: the measured slowdown from neighbours is **understated**. This is the same effect as TODO.md's idle-gap item (SmolVLA 289 ms at 1 Hz vs 188 ms back to back). Pinning the clock (`sudo jetson_clocks`) is a validity requirement for comparing alone with shared cells, not a nicety. The clock's maximum here is 1,386 MHz, not the 1,575 MHz device maximum; record which one a run used.
 
-</details>
-
 ### Round 3 exit criterion
 
 For each engine and telemetry source, state:
@@ -942,17 +890,14 @@ For each engine and telemetry source, state:
 
 ---
 
-
-
 ## Round 4 — Reporting mathematics and validation
-
-
 
 ### Goal
 
 Check that every named metric matches its implementation and that validation tests the right hypothesis.
 
-> **Since this round was written (`c4a4e5f`):**
+> **Since this round was written (**`c4a4e5f`**):**
+>
 > - Results are stored **raw only**, in `results/<date>-<question>/` (tidy CSVs via `harness/collect.py`, read back by `harness/results.py`). Runs no longer write `summary.json`, per-cell PNGs, or derived fields in `records.jsonl`; `report`, `compare` and `plot_tenancy` print their tables. Section 4.1 and the exit criterion are updated for this, and Question 4 below (new) tests it.
 > - `frames_delivered` is gone; the manifest has `frames_served`, `frames_overwritten`, `frames_error` next to `frames_emitted` (the conservation law in 4.6).
 > - All figures now use `harness/paper_style.py` (Round 6).
@@ -1002,8 +947,6 @@ The raw A1 summary demonstrates it:
 - `throughput_rps`: `0.0337`,
 - period: 30 seconds.
 
-
-
 ### 4.4 Energy
 
 `energy_joules()` at `report.py:54-64` selects samples between `t_send` and `t_end`, computes mean rail power, then multiplies by duration.
@@ -1048,8 +991,6 @@ emitted = ok + overwritten + error
 every req_id appears exactly once
 no served frame waits more than one cadence, absent emitter faults
 ```
-
-
 
 ### 4.7 Gate 2: inspect the raw probe, not just the report
 
@@ -1139,8 +1080,6 @@ Nine requests exceed two seconds. Most extra latency appears inside llama.cpp's 
 
 The report correlates the spikes with a labmate process periodically reaching high utilization, but the committed probe JSONL does not contain the utilization trace itself. Treat that causal attribution as supported by contemporaneous observation, not fully reproducible from this file alone.
 
-
-
 ### Question 2 — What does `energy_per_request_j` actually mean?
 
 Give a precise name for the quantity. Then say how it behaves when:
@@ -1179,8 +1118,6 @@ A precise name is “gross rail energy during served-request client interval.”
 
 For deployment capacity, gross board energy may be appropriate. For model attribution, add idle/co-runner baselines or controlled subtraction. For per-arriving-frame energy, define how idle, waiting, and overwritten frames share system energy.
 
-
-
 ### Question 3 — Is Gate 2 a clean test of the stated criterion?
 
 Assess the effect of:
@@ -1217,8 +1154,6 @@ It does not cleanly establish the latency distribution of 50 one-token requests 
 
 A cleaner design separates functional probing from latency probing: first inspect 1/4-token behavior on a small set, then run 50 one-token requests only under full telemetry and save a manifest.
 
-
-
 ### Question 4 — Can every number in a results README be regenerated, and from what?
 
 Pick three numbers in `results/2026-11-19-space-multitenancy-initial/README.md`: a p99, a "neighbours busy" share, and a miss rate at 3 s.
@@ -1245,15 +1180,13 @@ rg -n "raw_dir|refuse|do not know|stay in the raw" harness/collect.py harness/re
 column -s, -t results/2026-11-19-space-multitenancy-initial/cells.csv | less -S
 ```
 
-<details><summary>Verdict</summary>
+Verdict
 
 - **p99:** tenant 0's rows of that cell in `requests.csv` with an answer, `t_last_token − t_arrival`, 99th percentile (linear interpolation over 12 values, so near the slowest frame).
 - **Neighbours busy:** the neighbours' rows (`tenant` ≥ 1) of that cell, overlap of `[t_send, t_last_token]` with tenant 0's first-to-last frame, averaged over neighbours.
 - **Miss rate at 3 s:** all of tenant 0's rows, overwritten and failed included, `latency is None or latency > 3`.
 - **Not in the folder:** llama-server logs, `tegrastats.log`, and anything else the collector doesn't know. They stay in `raw_dir` on the Thor, which is not in git, so a results folder alone cannot answer questions about them.
 - **Refused:** a background log or sample CSV with a column the collector doesn't know, two cell directories with the same name, and a cell whose engine/model/quant/power mode changes between records.
-
-</details>
 
 ### Round 4 exit criterion
 
@@ -1267,17 +1200,14 @@ Choose any number in a printed summary (`harness.report`, `compare` or `plot_ten
 
 ---
 
-
-
 ## Round 5 — Forward design
-
-
 
 ### Goal
 
 Use the immediate roadmap to test whether current abstractions are good enough. Good architecture is not maximum generality; it is the smallest design that keeps the next experiments honest.
 
-> **Since this round was written (`c4a4e5f`):**
+> **Since this round was written (**`c4a4e5f`**):**
+>
 > - Neighbours exist now, but not as DESIGN.md's light/heavy co-runners: they are the same VLM in their own containers (`tenants`, `load`, `sharing`, `placement` cell fields; `co_runner` is still `none` only). Several items in 5.2 (own process, ready handshake, owned identity, cleanup) are implemented in `harness/tenancy.py`; Round 6, Question 1 tests the cleanup.
 > - We have sudo, so the power-mode transaction in 5.3 is buildable now (issue #10).
 > - Most acceptance tests in Question 3 have issues: alone-cell admission #11, co-runners #12, power #10, Stack B on the controller #6, reporter port #4. The integration decision record is #3.
@@ -1390,8 +1320,6 @@ It should also add:
 - schema versioning,
 - separate gross-system and incremental energy metrics if baselines exist.
 
-
-
 ### Question 1 — What should the controller own?
 
 Assign each responsibility to one of:
@@ -1451,8 +1379,6 @@ Staff-engineer verdict
 
 The exact placement of serialization depends on whether the research question includes it. Make that an explicit timed-stage decision rather than an accidental implementation detail.
 
-
-
 ### Question 2 — What should “GPU idle” mean for an alone cell?
 
 Design an admission and invalidation policy that handles the raw reality shown in:
@@ -1489,8 +1415,6 @@ Staff-engineer verdict
 Process presence alone is too strict because an idle server may reserve memory indefinitely. Utilization alone is too weak because a process can burst between samples.
 
 A practical policy combines an allowlist, a preflight quiet window (for example, zero unexpected compute processes and low utilization for a defined duration), continuous utilization/process logging, and post-run contamination flags. Unexpected high utilization should mark an “alone” cell invalid; whether to abort immediately depends on the cost of finishing the run for diagnostic value.
-
-
 
 ### Question 3 — What is the minimum proof before running expensive cells?
 
@@ -1536,8 +1460,6 @@ At minimum:
 
 Only after these pass should long real cells consume scarce Thor time.
 
-
-
 ### Round 5 exit criterion
 
 Produce a one-page design decision that states:
@@ -1551,11 +1473,7 @@ Produce a one-page design decision that states:
 
 ---
 
-
-
 ## Round 6 — The new code: tenancy, MPS, results, figures, visualizer
-
-
 
 ### Goal
 
@@ -1655,16 +1573,14 @@ nl -ba harness/mps.py | rg -C 3 "def __enter__|subprocess.run\(daemon|_partition
 nl -ba harness/engines/llama_server.py | rg -C 3 "docker stop|def __exit__|_wait_until_healthy"
 ```
 
-<details><summary>Verdict</summary>
+Verdict
 
 - **Neighbour 2 container fails:** clean. `LlamaServer.__enter__` stops its own container if the health wait fails, and `Tenants.__enter__` closes the stack: neighbour 1's container, then MPS.
 - **Second MPS partition fails: the daemon is left running.** `Mps.__enter__` starts the daemon, then `_partition_equally()` raises. Because `__enter__` raised, `ExitStack.enter_context` never registered `__exit__`, so nothing sends `quit`. The next partitioned cell finds a daemon on the same pipe directory and either refuses or fails to start a second one. Fix: start the daemon inside a `try` that quits it if partitioning fails.
 - **Second load generator fails: the first generator is orphaned.** `_stop_generators` is registered with `self._stack.callback` only *after* the loop that starts the generators, so a failure inside the loop closes the containers but never terminates the generators already running. They then send requests to a dead port and log errors until killed. Fix: register the callback before the loop (it is safe on an empty list).
-- **Ctrl-C during `measure()`:** clean. `KeyboardInterrupt` unwinds through every `with`: tenant 0, generators, containers, MPS, samplers.
+- **Ctrl-C during** `measure()`**:** clean. `KeyboardInterrupt` unwinds through every `with`: tenant 0, generators, containers, MPS, samplers.
 - **SIGKILL:** nothing is cleaned up. `finally` blocks don't run. Containers keep running (they belong to the Docker daemon, and `--rm` only removes them after they stop), generators keep running (child processes are not killed with their parent), the MPS daemon stays, and the GPU is no longer "alone".
-- **What a next run should check:** no running container named `lbi-*`, no MPS daemon on our pipe directory, no `harness.background` process, and no unexpected GPU process. That is the leftover-state half of issue #11's admission check.
-
-</details>
+- **What a next run should check:** no running container named `lbi-`*, no MPS daemon on our pipe directory, no `harness.background` process, and no unexpected GPU process. That is the leftover-state half of issue #11's admission check.
 
 ### Question 2 — Is "bursty time-slicing vs bursty MPS" a fair comparison?
 
@@ -1703,7 +1619,7 @@ for c in r.cells:
 PY
 ```
 
-<details><summary>Verdict</summary>
+Verdict
 
 - **Offered load: the same.** Same Poisson schedule and mean rate, from the same seeds.
 - **Achieved load: not the same.** Each neighbour has one slot. On a 6-SM partition a neighbour's request takes a median 4.4 s, against 1.6 s under time-slicing, so the bursts last longer and the next burst often catches up with the last: 62% busy vs 38%.
@@ -1711,8 +1627,6 @@ PY
 - So the comparison is fair as a **deployment** question ("the same cameras send the same requests; which sharing serves tenant 0 better?"), not as "equal neighbour activity". Say which one a figure answers.
 - **Other differences:** 3 tenants leave 2 of 20 SMs idle under partitions (6 SMs = 30%, not 33%); the GPU clock is not pinned (Round 3, Question 4); 12 frames per cell; neighbours' arrival phase relative to tenant 0 depends on warm-up length, which differs between the cells.
 - **Before the full matrix:** pin the clock, use 2 and 5 tenants (exact splits), at least 60 frames per cell, and record achieved neighbour load next to every result.
-
-</details>
 
 ### Question 3 — Which parts of a visualizer bundle are measured, which are modeled, and when does the bundle break?
 
@@ -1742,7 +1656,7 @@ Labelled by rule:
 nl -ba visualizer/bundle.py | rg -C 4 "FRAME_GAP_NS|def split_frames|def label_streams|def blocks_per_sm|warnings.append"
 ```
 
-<details><summary>Verdict</summary>
+Verdict
 
 - **(a) T = 3 s:** fine. The GPU is idle for about 1.6 s between frames, far above 300 ms.
 - **(b) T = 1.5 s with 1.4 s frames:** the gap is about 0.1 s, below 300 ms, so consecutive frames merge into one "frame". **(c) 30 Hz** merges everything into one frame.
@@ -1750,8 +1664,6 @@ nl -ba visualizer/bundle.py | rg -C 4 "FRAME_GAP_NS|def split_frames|def label_s
 - **Measured** (CUPTI): kernel start/end, grid, block, registers, shared memory, stream, memcpys, and in the ncu columns the counters themselves.
 - **Modeled:** blocks per SM and waves, and from them any idle-SM tail.
 - **Labelled by rule:** kernel family (name patterns) and stream role (`im2col` → vision encoder). A model without an `im2col` kernel gets every stream labelled "language model".
-
-</details>
 
 ### Question 4 — What can the ncu summary support, and what can't it?
 
@@ -1777,7 +1689,7 @@ python3 -c "import json; b=json.load(open('$B/bundle.json')); [print(k, v['launc
 rg -n "Profiling|No source files" $B/ncu/*.log
 ```
 
-<details><summary>Verdict</summary>
+Verdict
 
 - **Supported:** for `flash_attn_tile`, the pipe mix (FMA busy, tensor pipe idle), the stall mix (math-pipe throttle ≫ memory waits), occupancy limited by registers, and an L2 hit rate of 97%. All 27 calls have the same shape (grid 4,096 blocks), so two profiled launches represent them.
 - **Not supported yet:**
@@ -1787,8 +1699,6 @@ rg -n "Profiling|No source files" $B/ncu/*.log
   - anything about the other five kernels, whose first launches have shapes unlike the typical ones (`k_bin_bcast`: 12 µs under ncu vs 211 µs average in the frame);
   - whether llama-server runs the same kernels as `llama-mtmd-cli`. It uses the same libraries, which is likely but unchecked.
 - **To trust the other five:** profile the launches whose shape carries the most time in the bundle (choose `--launch-skip` per name), or profile all launches of one name and weight by shape. Add `--soc-metrics` from nsys for DRAM.
-
-</details>
 
 ### Round 6 exit criterion
 
@@ -1800,11 +1710,7 @@ For each new module, write one line each:
 
 ---
 
-
-
 ## Closing synthesis
-
-
 
 ### Your final assessment
 
@@ -1828,8 +1734,6 @@ The first experiment I would run after that is:
 Evidence that would change my mind:
 ```
 
-
-
 ### Discernment checklist
 
 When reviewing future systems code, ask:
@@ -1851,8 +1755,6 @@ When reviewing future systems code, ask:
 
 ---
 
-
-
 ## Command reference
 
 All commands are read-only except `pytest`, which may update `.pytest_cache`, and report commands, which can regenerate artifacts in a run directory.
@@ -1867,8 +1769,6 @@ git diff --stat 7f6c1f6..deadline-harness
 git diff main..deadline-harness -- harness/
 ```
 
-
-
 ### Read a file from the other branch without switching
 
 ```bash
@@ -1877,8 +1777,6 @@ git show main:harness/device.py
 git show main:harness/sweep.py
 ```
 
-
-
 ### Raw committed gate data
 
 ```bash
@@ -1886,8 +1784,6 @@ column -s, -t results/2026-11-04-gate2-real-model/requests.csv | less -S
 cat results/2026-11-04-gate1-dummy/checks-thor.json
 cat results/2026-11-04-gate1-dummy/checks-mac.json
 ```
-
-
 
 ### Existing Thor runs
 
@@ -1898,8 +1794,6 @@ cat /data/projects/pulak/runs/b1-pi05-latency-20261012-205216/summary.json
 rg -n "GPU busy|step|ALL_DONE|FAILED" \
   /data/projects/pulak/runs/sweeps-20261104.log
 ```
-
-
 
 ### Local verification
 

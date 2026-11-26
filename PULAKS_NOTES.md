@@ -124,7 +124,7 @@ initial naive results (2026-11-19, 1 vs 3 tenants, 12 frames per cell -- small!)
 
 ## more raw notes
 - why do we even need --max-minutes? my reading is that the point of the montonic deadline is that a frame isnt sent while another one is being processed but isnt the frame consumed and converted to tokens sometime in the start? we are waiting on the vlm, so we can just replace the old frame right?
-- when do we do our measurement? and how do we make sure it does not affect the CPU processing being done.
-- the feeder should stay in fixed mode in general
-- the latency includes all of these: waiting in the mailbox, uploading the JSON body, the server's own prefill and decode, and the token traveling back.
- 
+- when do we do our measurement? and how do we make sure it does not affect the CPU processing being done?
+- the feeder should stay in fixed mode in general.
+- the latency includes all of these: waiting in the mailbox, uploading the JSON body, the server's own prefill and decode, and the token traveling back. this could be a problem if they become significant compared to latency of the model...
+- 
