@@ -228,7 +228,17 @@ function renderKernels() {
     el("td", { className: "num", textContent: fmt(a.us / a.calls / 1000, 3) }),
     el("td", { className: "num", textContent: fmt(a.blocks / a.calls) }),
     el("td", { className: "num", textContent: fmt(a.waves / a.calls, 1) }),
+    ...ncuCells(a.name.short),
   ])));
+}
+
+// Nsight Compute columns, if ncu_top_kernels.sh has been run on this bundle.
+function ncuCells(shortName) {
+  const n = (bundle.ncu || {})[shortName];
+  if (!n) return [el("td", { className: "num muted", textContent: "–" }), el("td", { className: "muted", textContent: "–" })];
+  const stalls = Object.entries(n.stalls_pct || {}).slice(0, 3).map(([reason, pct]) => `${reason.replaceAll("_", " ")} ${fmt(pct)}%`).join(", ");
+  const detail = `ncu, ${n.launches} launch(es) at ${fmt(n.clock_mhz)} MHz: ${fmt(n.time_us / 1000, 2)} ms, occupancy ${fmt(n.occupancy_pct)}%, issue active ${fmt(n.issue_active_pct)}%, tensor pipe ${fmt(n.tensor_hmma_pct)}%, L2 hit ${fmt(n.l2_hit_pct)}%`;
+  return [el("td", { className: "num", textContent: fmt(n.sm_pct), title: detail }), el("td", { textContent: stalls, title: detail })];
 }
 
 $("#save-notes").addEventListener("click", async () => {

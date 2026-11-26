@@ -23,7 +23,10 @@ The current repository is therefore both an experiment and a prototype of that f
 ### Review status
 
 - Round 1: completed and clarified below.
-- Rounds 2-5: pending.
+- Round 2: Q1 answered and recorded below (2026-11-23); Q2-Q4 pending.
+- Rounds 3-6: pending. Rounds 2-5 were refreshed on 2026-11-19 for the code merged in #18;
+  Round 6 (new) reviews the code written after Round 1: tenancy, MPS, background load,
+  results/, paper_style, visualizer.
 - Pre-merge recommendations: provisional until all rounds are complete.
 
 ### Evidence rule
@@ -957,6 +960,54 @@ Despite `async def`, that blocks the event loop for two seconds. The emitter can
 
 That is why a blocking in-process LeRobot call needs a worker thread/process, while async HTTP to llama-server can remain on the loop.
 
+## Round 2 — Timing critical path and observer effect
+
+### Q1 — Mailbox outcomes (frames at 0-4 s, 1.5 s service, D = 1 s)
+
+My answer:
+
+> frame 0: 0, 1.5, completes, miss
+> frame 1: 1, 3, completes, miss
+> frame 2: 2, -, replaced, miss
+> frame 3: 3, 4.5, completes, miss
+> frame 4: 4, 6, completes, miss
+
+Simulator (`simulate_mailbox`, exact 1.5 s):
+
+| frame | arrives | starts | ends | latency | outcome |
+|---|---|---|---|---|---|
+| 0 | 0 | 0 | 1.5 | 1.5 | served, miss |
+| 1 | 1 | 1.5 | 3.0 | 2.0 | served, miss |
+| 2 | 2 | 3.0 | 4.5 | 2.5 | served, miss |
+| 3 | 3 | — | — | — | overwritten by 4 |
+| 4 | 4 | 4.5 | 6.0 | 2.0 | served, miss |
+
+What I got right: one frame is overwritten, the rest are served late, and all five miss.
+The end times (1.5, 3, 4.5, 6) were right too.
+
+### Correction 1: start is not arrival
+
+I wrote each frame's arrival time as its start. There is one slot, so a frame that
+arrives while the model is busy **waits in the mailbox**. Frame 1 waits 0.5 s and frame 4
+waits 0.5 s. That wait is inside the latency (`t_last_token − t_arrival`). That's why
+frame 1's latency is 2.0 s and not 1.5 s, and why "fraction of service times > D" is not
+the miss rate. **Code fact.**
+
+### Correction 2 (partial): which frame is overwritten is a tie
+
+At t = 3.0 frame 1 finishes and frame 3 arrives at the same instant. The simulator lets
+the model take the waiting frame first (`free_at <= frame.t_obs`), so frame 2 is served
+and frame 3 later loses to frame 4. With a service time of 1.5001 s, the simulator gives
+**my** answer: frame 2 is overwritten and frame 3 runs 3.0002 → 4.5003 (latency 1.5 s).
+So my overwrite choice is the right outcome whenever service takes even slightly longer
+than 1.5 s. The question sits exactly on the tie. **Code fact** (checked by rerunning the
+simulator at 1.5001 s).
+
+Consequence for the real harness: arrivals are about 0.7 ms late (feeder lateness) and
+service time jitters, so near-ties resolve randomly. Under the same conditions, a run can
+serve a frame that is 1 s old or the newest one, and the measured miss rate depends on
+which. **Open hypothesis:** how often near-ties happen when service ≈ k·T.
+
 ## Emerging target architecture
 
 ### The final product should drive the abstraction
@@ -1401,3 +1452,10 @@ A branch can improve one layer and regress another. Review should produce a capa
 - What is the minimum common runtime interface across llama.cpp, LeRobot, and future vLLM?
 - How should unexpected and controlled tenants be represented?
 - Which changes are true merge blockers versus follow-up milestones?
+
+### Round 6
+
+- Does every process a cell starts get stopped on every failure path (MPS daemon, load generators)?
+- Is "bursty time-slicing vs bursty MPS" a fair comparison when neighbours' achieved load differs?
+- When do visualizer bundles split frames wrongly, and which of their numbers are modeled?
+- What can the ncu summary support before the "typical calls" fix?

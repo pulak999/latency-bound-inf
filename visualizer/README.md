@@ -62,3 +62,8 @@ Bundles live in `/data/projects/rohan/profiles/<YYYYmmdd-HHMMSS>-<name>/` (heavy
 - **Labelled by rule**: the stream that runs the patch embedding (`im2col`) is the vision encoder;
   kernel families come from name patterns in `bundle.py`.
 - Frames are matched to the client's requests by order, not by timestamp.
+- **ncu numbers** are from the first launches of each kernel name in a single `llama-mtmd-cli` frame,
+  at ncu's locked clock (about 1,070 MHz), so times are longer than nsys's: `flash_attn_tile` takes
+  46 ms under ncu vs 36 ms in the real run, which fits a ~30% higher clock (not measured). For kernels that run at many shapes (`k_bin_bcast`, `mul_mat_q`, `norm_f32`) the first
+  launches are not typical; `flash_attn_tile` runs at one shape and is. On the Thor, ncu's DRAM
+  counter reads 0% even for kernels that miss L2 entirely, so DRAM traffic needs nsys `--soc-metrics`.

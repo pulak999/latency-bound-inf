@@ -4,7 +4,8 @@
 
 Reads records.jsonl, power.csv and manifest.json (or run.json from the older
 runner) and prints the summary. With --figures, also draws latency_cdf.png,
-miss_vs_deadline.png and timeline.png into DIR. Nothing is written into the
+miss_vs_deadline.png and timeline.png (each also as .pdf, in the paper style of
+harness/paper_style.py) into DIR. Nothing is written into the
 cell directory: it holds only what was measured.
 
 The deadline is applied here, not during the run: one log gives the miss rate
@@ -22,6 +23,7 @@ matplotlib.use("Agg")  # file output only; the Thor runs headless
 import matplotlib.pyplot as plt
 import numpy as np
 
+from harness import paper_style as ps
 from harness.device import PowerSample, read_gpu_utilization_csv, read_power_csv
 from harness.records import RequestRecord, read_records
 
@@ -159,48 +161,84 @@ def summarize(records: list[RequestRecord], power: list[PowerSample]) -> dict:
     return summary
 
 
+def mark_deadline(ax, period_s: float | None, vertical: bool = True) -> None:
+    """The cell's deadline D = T, dotted black, labelled at the axis edge."""
+    if period_s is None:
+        return
+    if vertical:
+        ax.axvline(period_s, color=ps.INK, lw=ps.LW, ls=ps.DEADLINE_LS)
+        ax.text(
+            period_s,
+            1.0,
+            f" $D$ = $T$ = {period_s:g} s",
+            transform=ax.get_xaxis_transform(),
+            ha="left",
+            va="top",
+            fontsize=ps.F_SMALL,
+            color=ps.INK,
+        )
+    else:
+        ax.axhline(period_s, color=ps.INK, lw=ps.LW, ls=ps.DEADLINE_LS)
+        ax.text(
+            0.0,
+            period_s,
+            f" $D$ = $T$ = {period_s:g} s",
+            transform=ax.get_yaxis_transform(),
+            ha="left",
+            va="bottom",
+            fontsize=ps.F_SMALL,
+            color=ps.INK,
+        )
+
+
+def definitions(period_s: float | None) -> tuple[str, ...]:
+    """What D and T mean, for the figures that show them."""
+    return (ps.D_MEANS, ps.T_MEANS) if period_s is not None else ()
+
+
 def plot_latency_cdf(records: list[RequestRecord], period_s: float | None, path: Path) -> None:
     """Share of all frames finished by each latency, with the deadline marked if there is one.
 
-    Overwritten and failed frames never finish, so the curve stops below 1.
+    Overwritten and failed frames never finish, so the curve stops below 100 %.
     """
-    latencies_ms = np.sort([r.latency_s * 1000 for r in answered_records(records)])
-    share_finished = np.arange(1, len(latencies_ms) + 1) / len(records)
+    latencies = np.sort([r.latency_s for r in answered_records(records)])
+    share_finished = 100 * np.arange(1, len(latencies) + 1) / len(records)
+    notes = definitions(period_s)
 
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.step(latencies_ms, share_finished, where="post")
-    if period_s is not None:
-        ax.axvline(period_s * 1000, color="red", linestyle="--", label=f"D = T = {period_s:g} s")
-        ax.legend()
-    ax.set_xlabel("latency, arrival to last token (ms)")
-    ax.set_ylabel("share of frames finished")
-    ax.set_ylim(0, 1.01)
-    ax.grid(alpha=0.3)
-    fig.tight_layout()
-    fig.savefig(path, dpi=150)
-    plt.close(fig)
+    fig, ax = plt.subplots(figsize=(ps.COLUMN_IN, 2.0 + 0.2 * len(notes)))
+    ax.step(latencies, share_finished, where="post", color=ps.BLUE, lw=1.1)
+    mark_deadline(ax, period_s)
+    ax.set_xlabel(f"latency, {ps.TE} − {ps.TO} (s)")
+    ax.set_ylabel("frames finished (%)")
+    ax.set_ylim(0, 103)
+    ax.grid(axis="y")
+    printed = ps.footnote(fig, *notes) if notes else 0
+    fig.set_figheight(2.0 + 0.11 * printed)
+    fig.tight_layout(rect=(0, 0.11 * printed / fig.get_figheight(), 1, 1))
+    ps.save(fig, path)
 
 
 def plot_miss_rate_vs_deadline(
     records: list[RequestRecord], period_s: float | None, path: Path
 ) -> None:
+    """Share of frames (overwritten and failed included) that miss each deadline D."""
     latencies = [r.latency_s for r in answered_records(records)]
     longest = max(latencies, default=1.0)
     max_deadline = max(longest * 1.5, (period_s or 0) * 1.5)
     deadlines, rates = miss_rate_curve(records, max_deadline)
+    notes = definitions(period_s) or (ps.D_MEANS,)
 
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.plot(deadlines, rates)
-    if period_s is not None:
-        ax.axvline(period_s, color="red", linestyle="--", label=f"D = T = {period_s:g} s")
-        ax.legend()
-    ax.set_xlabel("deadline D (s)")
-    ax.set_ylabel("miss rate")
-    ax.set_ylim(0, 1.01)
-    ax.grid(alpha=0.3)
-    fig.tight_layout()
-    fig.savefig(path, dpi=150)
-    plt.close(fig)
+    fig, ax = plt.subplots(figsize=(ps.COLUMN_IN, 2.0 + 0.2 * len(notes)))
+    ax.step(deadlines, 100 * rates, where="post", color=ps.BLUE, lw=1.1)
+    mark_deadline(ax, period_s)
+    ax.set_xlabel("deadline $D$ (s)")
+    ax.set_ylabel("frames that miss $D$ (%)")
+    ax.set_ylim(-2, 103)
+    ax.grid(axis="y")
+    printed = ps.footnote(fig, *notes)
+    fig.set_figheight(2.0 + 0.11 * printed)
+    fig.tight_layout(rect=(0, 0.11 * printed / fig.get_figheight(), 1, 1))
+    ps.save(fig, path)
 
 
 def plot_timeline(
@@ -210,59 +248,104 @@ def plot_timeline(
     period_s: float | None,
     path: Path,
 ) -> None:
-    """Per-frame latency over the cell, with GPU clock and load beneath it.
+    """Per-frame latency over the cell, with GPU clock and GPU load in panels beneath it.
 
-    A slow frame can be matched by eye to a clock drop or a load spike.
+    A slow frame can be matched by eye to a clock drop or a load spike. Frames
+    later than D = T are orange; overwritten or failed frames are marked at the
+    bottom of panel (a).
     """
     t0 = min(r.t_arrival for r in records)
-    fig, (ax_lat, ax_dev) = plt.subplots(
-        2, 1, figsize=(10, 6), sharex=True, gridspec_kw={"height_ratios": [2, 1]}
+    notes = definitions(period_s)
+    fig, (ax_lat, ax_clock, ax_load) = plt.subplots(
+        3,
+        1,
+        figsize=(ps.WIDTH_IN, 3.6 + 0.15 * len(notes)),
+        sharex=True,
+        gridspec_kw={"height_ratios": [2, 1, 1]},
     )
 
     ok = answered_records(records)
-    ax_lat.plot(
-        [r.t_arrival - t0 for r in ok], [r.latency_s * 1000 for r in ok], ".", label="latency"
+    late = [r for r in ok if period_s is not None and r.latency_s > period_s]
+    on_time = [r for r in ok if r not in late]
+    ax_lat.scatter(
+        [r.t_arrival - t0 for r in on_time],
+        [r.latency_s for r in on_time],
+        s=7,
+        color=ps.BLUE,
+        lw=0,
+        label="frame, on time",
+        zorder=3,
     )
+    if late:
+        ax_lat.scatter(
+            [r.t_arrival - t0 for r in late],
+            [r.latency_s for r in late],
+            s=7,
+            color=ps.ORANGE,
+            lw=0,
+            label="frame, late",
+            zorder=3,
+        )
     dropped = [r for r in records if r.outcome != "ok"]
     if dropped:
-        ax_lat.plot(
+        ax_lat.scatter(
             [r.t_arrival - t0 for r in dropped],
             [0] * len(dropped),
-            "x",
-            color="red",
-            label="overwritten / error",
+            s=12,
+            marker="x",
+            color=ps.ORANGE,
+            lw=0.8,
+            label="overwritten or failed",
+            zorder=3,
         )
-    if period_s is not None:
-        ax_lat.axhline(period_s * 1000, color="red", linestyle="--", label="D = T")
-    ax_lat.set_ylabel("latency (ms)")
-    ax_lat.legend(loc="upper right")
-    ax_lat.grid(alpha=0.3)
+    mark_deadline(ax_lat, period_s, vertical=False)
+    tallest = max([r.latency_s for r in ok] + [period_s or 0.0])
+    ax_lat.set_ylim(0, 1.18 * tallest)  # room above the deadline for its label
+    ax_lat.set_ylabel("latency (s)")
+    ax_lat.grid(axis="y")
+    ax_lat.legend(loc="upper right", ncol=3, handletextpad=0.3)
+    ps.panel_title(ax_lat, "a", f"every frame, {ps.TE} − {ps.TO}")
 
     clocks = [(s.t - t0, s.gpu_mhz) for s in power if s.gpu_mhz is not None]
     if clocks:
-        ax_dev.plot(*zip(*clocks, strict=True), color="tab:green", linewidth=0.8, label="GPU MHz")
-        ax_dev.set_ylabel("GPU clock (MHz)")
+        ax_clock.plot(*zip(*clocks, strict=True), color=ps.INK, lw=0.6)
+    else:
+        ax_clock.text(
+            0.5,
+            0.5,
+            "no GPU clock samples",
+            ha="center",
+            va="center",
+            transform=ax_clock.transAxes,
+            color=ps.MUTED,
+        )
+    ax_clock.set_ylabel("MHz")
+    ax_clock.grid(axis="y")
+    ps.panel_title(ax_clock, "b", "GPU clock")
+
     if gpu_util:
-        ax_util = ax_dev.twinx()
-        ax_util.plot(
-            [t - t0 for t, _ in gpu_util],
-            [u for _, u in gpu_util],
-            color="tab:gray",
-            linewidth=0.6,
-            alpha=0.7,
-            label="GPU load %",
+        ax_load.plot(
+            [t - t0 for t, _ in gpu_util], [u for _, u in gpu_util], color=ps.MUTED, lw=0.6
         )
-        ax_util.set_ylabel("GPU load (%)")
-        ax_util.set_ylim(0, 100)
-    if not clocks and not gpu_util:
-        ax_dev.text(
-            0.5, 0.5, "no GPU clock or load samples", ha="center", transform=ax_dev.transAxes
+        ax_load.set_ylim(0, 103)
+    else:
+        ax_load.text(
+            0.5,
+            0.5,
+            "no GPU load samples",
+            ha="center",
+            va="center",
+            transform=ax_load.transAxes,
+            color=ps.MUTED,
         )
-    ax_dev.set_xlabel("time since first frame (s)")
-    ax_dev.grid(alpha=0.3)
-    fig.tight_layout()
-    fig.savefig(path, dpi=150)
-    plt.close(fig)
+    ax_load.set_ylabel("%")
+    ax_load.grid(axis="y")
+    ps.panel_title(ax_load, "c", "GPU load, all processes")
+    ax_load.set_xlabel("time since the first frame (s)")
+    printed = ps.footnote(fig, *notes) if notes else 0
+    fig.set_figheight(3.6 + 0.11 * printed)
+    fig.tight_layout(rect=(0, 0.11 * printed / fig.get_figheight(), 1, 1), h_pad=0.4)
+    ps.save(fig, path)
 
 
 def load_cell(run_dir: Path) -> tuple[dict, list[RequestRecord], list[PowerSample]]:
@@ -289,6 +372,7 @@ def report(run_dir: Path, figures_dir: Path | None = None) -> dict:
 
     if figures_dir is not None and answered_records(records):
         figures_dir.mkdir(parents=True, exist_ok=True)
+        ps.apply()
         plot_latency_cdf(records, period_s, figures_dir / "latency_cdf.png")
         plot_miss_rate_vs_deadline(records, period_s, figures_dir / "miss_vs_deadline.png")
         gpu_util = read_gpu_utilization_csv(run_dir / "gpu_util.csv")
